@@ -75,39 +75,39 @@ maven_jar(
 
 # These are dependencies of please_maven, so of course we can't fetch them with maven_jars :(
 maven_jar(
-    name = 'aether-core',
-    id = 'org.eclipse.aether:aether-core:1.0.2.v20150114',
-    hash = '',
-)
-maven_jar(
     name = 'aether-api',
-    id = 'org.eclipse.aether:aether-api:1.0.2.v20150114',
-    hash = '968d9fa7fe069c4cff001f7a9b17f681e3fd655b',
+    id = 'org.eclipse.aether:aether-api:1.1.0',
+    hash = 'd3136e5cbf28f19da5e0cfa586955bffe1394e5a',
 )
 maven_jar(
     name = 'aether-spi',
-    id = 'org.eclipse.aether:aether-api:1.0.2.v20150114',
-    hash = '',
+    id = 'org.eclipse.aether:aether-spi:1.1.0',
+    hash = 'abc78b25239133302878c674cc9bddd67c769503',
 )
 maven_jar(
     name = 'aether-impl',
-    id = 'org.eclipse.aether:aether-impl:1.0.2.v20150114',
-    hash = 'f3a63e29cc1527ce725dc69eb2d377caa1e92f19',
+    id = 'org.eclipse.aether:aether-impl:1.1.0',
+    hash = '6415a95e00c74b6a301134a021bec25a2c5cf1e5',
+)
+maven_jar(
+    name = 'aether-util',
+    id = 'org.eclipse.aether:aether-util:1.1.0',
+    hash = '92193805a410c32cddaffc52220de4a55c6c5fac',
 )
 maven_jar(
     name = 'aether-connector-basic',
-    id = 'org.eclipse.aether:aether-connector-basic:1.0.2.v20150114',
-    hash = 'db50828b7bf5649190d8c28c16e9dd1e470d52fd',
+    id = 'org.eclipse.aether:aether-connector-basic:1.1.0',
+    hash = '6e86e0a04f7cb4aec710fbdae538219374449fdf',
 )
 maven_jar(
     name = 'aether-transport-file',
-    id = 'org.eclipse.aether:aether-transport-file:1.0.2.v20150114',
-    hash = 'c5dcb38aa79419c58e001efc96ef4733e466b56a',
+    id = 'org.eclipse.aether:aether-transport-file:1.1.0',
+    hash = '34301a5094e688669d3ff4960e234fea8b246b3c',
 )
 maven_jar(
     name = 'aether-transport-http',
-    id = 'org.eclipse.aether:aether-transport-http:1.0.2.v20150114',
-    hash = 'fee2fbe46c2d67c220613d388bc45c9d783982d0',
+    id = 'org.eclipse.aether:aether-transport-http:1.1.0',
+    hash = '4ef20e8d2e970a15b6e23cf2dd2383341b4a4716',
 )
 maven_jar(
     name = 'maven-aether-provider',
