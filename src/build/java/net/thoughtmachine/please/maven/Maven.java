@@ -1,5 +1,6 @@
 package maven;
 
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -49,7 +50,7 @@ public class Maven {
     PreorderNodeListGenerator visitor = new PreorderNodeListGenerator();
     collectResult.getRoot().accept(visitor);
 
-    Set<Artifact> artifacts = new HashSet<>();
+    Set<Artifact> artifacts = new LinkedHashSet<>();
     for (DependencyNode node : visitor.getNodes()) {
       // TODO(pebers): Optional dependencies will be needed at some point.
       if (!node.getDependency().isOptional()) {
