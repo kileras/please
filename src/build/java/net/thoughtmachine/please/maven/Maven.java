@@ -71,7 +71,8 @@ public class Maven {
     locator.setErrorHandler(new DefaultServiceLocator.ErrorHandler() {
       @Override
       public void serviceCreationFailed(Class<?> type, Class<?> impl, Throwable exception) {
-        exception.printStackTrace();;
+        exception.printStackTrace();
+        throw new RuntimeException(exception);
       }
     });
 

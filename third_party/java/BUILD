@@ -110,6 +110,52 @@ maven_jar(
     name = 'maven-aether-provider',
     id = 'org.apache.maven:maven-aether-provider:3.1.0',
     hash = '3287089d27eaad587ba199fc2778c84bc53aae91',
+    deps = [
+        ':maven-model',
+        ':maven-model-builder',
+        ':plexus-interpolation',
+        ':plexus-utils',
+        ':apache-httpclient',
+    ],
+)
+maven_jar(
+    name = 'maven-model',
+    id = 'org.apache.maven:maven-model:3.1.0',
+    hash = '70513759956a970cdd1d34d4dfa22ec2c4514cad',
+)
+maven_jar(
+    name = 'maven-model-builder',
+    id = 'org.apache.maven:maven-model-builder:3.1.0',
+    hash = 'cd0515de88e6730f8af1f814d84d785800cb9e9e',
+)
+maven_jar(
+    name = 'plexus-utils',
+    id = 'org.codehaus.plexus:plexus-utils:3.0.24',
+    hash = '2b24d3655cbf4818b0f6a04cd0db3fb9725fc860',
+)
+maven_jar(
+    name = 'plexus-interpolation',
+    id = 'org.codehaus.plexus:plexus-interpolation:1.22',
+    hash = 'c775dd99236f54810d1fbbd62be2f38778e93f87',
+)
+maven_jar(
+    name = 'apache-httpclient',
+    id = 'org.apache.httpcomponents:httpclient:4.5.2',
+    hash = '8d40bc712989a1354aae4bd8e2fac506983dabdb',
+    deps = [
+        ':apache-httpcore',
+        ':commons-logging',
+    ],
+)
+maven_jar(
+    name = 'apache-httpcore',
+    id = 'org.apache.httpcomponents:httpcore:4.4.4',
+    hash = '5b941b53315bd0b2bcf683a4460c78a38373c2b7',
+)
+maven_jar(
+    name = 'commons-logging',
+    id = 'commons-logging:commons-logging:1.2',
+    hash = '13db4bf491f66b8fdcbb20b9885129cc790ebe76',
 )
 maven_jar(
     name = 'args4j',
