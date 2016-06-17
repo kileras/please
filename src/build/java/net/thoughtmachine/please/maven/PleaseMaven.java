@@ -45,8 +45,6 @@ public class PleaseMaven {
       System.exit(1);
     }
 
-    System.err.println("Fetching dependencies from maven...\n");
-
     for (String artifactName : artifactNames) {
       Set<Artifact> artifacts = Maven.transitiveDependencies(new DefaultArtifact(artifactName));
       for (Artifact artifact : artifacts) {
