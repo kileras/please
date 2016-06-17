@@ -75,37 +75,47 @@ maven_jar(
 
 # These are dependencies of please_maven, so of course we can't fetch them with maven_jars :(
 maven_jar(
+    name = 'aether-core',
+    id = 'org.eclipse.aether:aether-core:1.0.2.v20150114',
+    hash = '',
+)
+maven_jar(
     name = 'aether-api',
+    id = 'org.eclipse.aether:aether-api:1.0.2.v20150114',
+    hash = '968d9fa7fe069c4cff001f7a9b17f681e3fd655b',
+)
+maven_jar(
+    name = 'aether-spi',
     id = 'org.eclipse.aether:aether-api:1.0.2.v20150114',
     hash = '',
 )
 maven_jar(
     name = 'aether-impl',
     id = 'org.eclipse.aether:aether-impl:1.0.2.v20150114',
-    hash = '',
+    hash = 'f3a63e29cc1527ce725dc69eb2d377caa1e92f19',
 )
 maven_jar(
     name = 'aether-connector-basic',
     id = 'org.eclipse.aether:aether-connector-basic:1.0.2.v20150114',
-    hash = '',
+    hash = 'db50828b7bf5649190d8c28c16e9dd1e470d52fd',
 )
 maven_jar(
     name = 'aether-transport-file',
     id = 'org.eclipse.aether:aether-transport-file:1.0.2.v20150114',
-    hash = '',
+    hash = 'c5dcb38aa79419c58e001efc96ef4733e466b56a',
 )
 maven_jar(
     name = 'aether-transport-http',
     id = 'org.eclipse.aether:aether-transport-http:1.0.2.v20150114',
-    hash = '',
+    hash = 'fee2fbe46c2d67c220613d388bc45c9d783982d0',
 )
 maven_jar(
     name = 'maven-aether-provider',
     id = 'org.apache.maven:maven-aether-provider:3.1.0',
-    hash = '',
+    hash = '3287089d27eaad587ba199fc2778c84bc53aae91',
 )
 maven_jar(
     name = 'args4j',
     id = 'args4j:args4j:2.32',
-    hash = '',
+    hash = 'a08fb9a7217df438872f27936058f594eab29396',
 )
