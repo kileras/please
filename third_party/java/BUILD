@@ -72,3 +72,62 @@ maven_jar(
     id = 'com.google.protobuf:protobuf-java:3.0.0-beta-1',
     hash = 'b832e95bd94c68a01c32985d99ca5bb74bb0e0dc',
 )
+
+github_file(
+    name = 'bazel-deps-src',
+    repo = 'pgr0ss/bazel-deps',
+    file = 'src/main/java/braintree/Maven.java',
+    revision = 'c9d7afea5b38a90db0358a2dfc5a4729ceaf4bd9',
+    hash = 'd0fcb1fee6c4db1751c52bee4f8b5cd1d0a27f64',
+)
+
+java_library(
+    name = 'bazel-deps',
+    srcs = [':bazel-deps-src'],
+    deps = [
+        ':guava',
+        ':aether-api',
+        ':aether-impl',
+        ':aether-connector-basic',
+        ':aether-transport-file',
+        ':aether-transport-http',
+        ':maven-aether-provider',
+    ],
+)
+
+# These are dependencies of please_maven, so of course we can't fetch them with maven_jars :(
+maven_jar(
+    name = 'aether-api',
+    id = 'org.eclipse.aether:aether-api:1.0.2.v20150114',
+    hash = '',
+)
+maven_jar(
+    name = 'aether-impl',
+    id = 'org.eclipse.aether:aether-impl:1.0.2.v20150114',
+    hash = '',
+)
+maven_jar(
+    name = 'aether-connector-basic',
+    id = 'org.eclipse.aether:aether-connector-basic:1.0.2.v20150114',
+    hash = '',
+)
+maven_jar(
+    name = 'aether-transport-file',
+    id = 'org.eclipse.aether:aether-transport-file:1.0.2.v20150114',
+    hash = '',
+)
+maven_jar(
+    name = 'aether-transport-http',
+    id = 'org.eclipse.aether:aether-transport-http:1.0.2.v20150114',
+    hash = '',
+)
+maven_jar(
+    name = 'maven-aether-provider',
+    id = 'org.apache.maven:maven-aether-provider:3.1.0',
+    hash = '',
+)
+maven_jar(
+    name = 'args4j',
+    id = 'args4j:args4j:2.32',
+    hash = '',
+)

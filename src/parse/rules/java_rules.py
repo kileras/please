@@ -380,9 +380,12 @@ def maven_jar(name, id=None, repository=None, hash=None, hashes=None, deps=None,
     try:
         group, artifact, version = id.split(':')
     except ValueError:
-        group, artifact, version, licence = id.split(':')
-        if licence and not licences:
-            licences = licence.split('|')
+        try:
+            group, artifact, version, licence = id.split(':')
+            if licence and not licences:
+                licences = licence.split('|')
+        except ValueError:
+            raise ParseError('Expected Maven artifact in group:artifact:version format (got %s)' % id)
     filename = filename or '%s-%s.%s' % (artifact, version, artifact_type)
     repository = repository or CONFIG.DEFAULT_MAVEN_REPO
     bin_url = '/'.join([
