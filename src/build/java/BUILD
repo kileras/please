@@ -7,6 +7,15 @@ java_binary(
     visibility = ['PUBLIC']
 )
 
+java_binary(
+    name = 'please_maven',
+    main_class = 'net.thoughtmachine.please.maven.PleaseMaven',
+    deps = [
+        '//src/build/java/net/thoughtmachine/please/maven',
+    ],
+    self_executable = True,
+)
+
 go_library(
     name = 'java',
     srcs = ['zip_writer.go'],
@@ -27,7 +36,7 @@ go_binary(
 )
 
 go_binary(
-    name = 'please_maven',
+    name = 'please_maven_old',
     deps = [
         '//src/output',
         '//third_party/go:logging',

@@ -1,4 +1,4 @@
-package maven;
+package net.thoughtmachine.please.maven;
 
 import java.util.ArrayList;
 import java.util.Collection;

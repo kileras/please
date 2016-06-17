@@ -12,13 +12,10 @@ maven_jar(
     hash = 'sha1: 6e72502584462b2d35a7a6a18fc5541c412f08cc',
 )
 
-maven_jars(
+maven_jar(
     name = 'guava',
     id = 'com.google.guava:guava:18.0',
-    exclude = ['jsr305'],
-    hashes = {
-        'guava': 'sha1: 8908f57125132a4468ea9977705a83f61b94fa89',
-    }
+    hash = 'sha1: 8908f57125132a4468ea9977705a83f61b94fa89',
 )
 
 maven_jars(

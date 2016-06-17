@@ -13,4 +13,5 @@ java_library(
         '//third_party/java:maven-aether-provider',
         '//third_party/java:args4j',
     ],
+    visibility = ['//src/build/java/...'],
 )

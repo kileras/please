@@ -1,4 +1,4 @@
-package maven;
+package net.thoughtmachine.please.maven;
 
 import java.util.LinkedHashSet;
 import java.util.List;
