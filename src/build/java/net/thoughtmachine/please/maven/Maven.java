@@ -49,11 +49,14 @@ public class Maven {
     PreorderNodeListGenerator visitor = new PreorderNodeListGenerator();
     collectResult.getRoot().accept(visitor);
 
-    return ImmutableSet.copyOf(
-      visitor.getNodes().stream()
-        .filter(d -> !d.getDependency().isOptional())
-        .map(DependencyNode::getArtifact)
-        .collect(Collectors.toList()));
+    Set<Artifact> artifacts = new HashSet<>();
+    for (DependencyNode node : visitor.getNodes()) {
+      // TODO(pebers): Optional dependencies will be needed at some point.
+      if (!node.getDependency().isOptional()) {
+        artifacts.add(node.getArtifact());
+      }
+    }
+    return artifacts;
   }
 
   private static RepositorySystem newRepositorySystem() {
