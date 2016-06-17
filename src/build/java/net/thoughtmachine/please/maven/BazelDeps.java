@@ -1,4 +1,4 @@
-package braintree;
+package maven;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -19,10 +19,10 @@ import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 
-public class BazelDeps {
+public class PleaseMaven {
 
-  @Option(name = "-x", usage = "Exclude a libraries dependencies")
-  private String excludeArtifact;
+  @Option(name = "-x", usage = "Artifacts to exclude")
+  private List<String> excludeArtifact = new ArrayList<>();
 
   @Argument(usage = "<artifact id>")
   private List<String> artifactNames = new ArrayList<>();

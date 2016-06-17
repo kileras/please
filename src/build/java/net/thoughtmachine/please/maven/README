@@ -1,0 +1,2 @@
+Some of the files in this directory are derived from Braintree's bazel-deps project
+(https://github.com/pgr0ss/bazel-deps) and are used under the MIT licence.

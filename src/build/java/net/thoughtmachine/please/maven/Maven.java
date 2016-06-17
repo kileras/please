@@ -1,4 +1,4 @@
-package braintree;
+package maven;
 
 import java.util.List;
 import java.util.Set;
