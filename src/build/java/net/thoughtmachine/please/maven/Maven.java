@@ -31,7 +31,14 @@ import org.eclipse.aether.util.graph.visitor.PreorderNodeListGenerator;
 
 public class Maven {
 
-  public static Set<Artifact> transitiveDependencies(Artifact artifact) {
+  private final String repository;
+
+  public Maven(String repository) {
+    this.repository = repository;
+  }
+
+  public
+  Set<Artifact> transitiveDependencies(Artifact artifact) {
 
     RepositorySystem system = newRepositorySystem();
 
@@ -61,7 +68,7 @@ public class Maven {
     return artifacts;
   }
 
-  private static RepositorySystem newRepositorySystem() {
+  private RepositorySystem newRepositorySystem() {
     DefaultServiceLocator locator = MavenRepositorySystemUtils.newServiceLocator();
     locator.addService(RepositoryConnectorFactory.class, BasicRepositoryConnectorFactory.class);
     locator.addService(TransporterFactory.class, FileTransporterFactory.class);
@@ -79,7 +86,7 @@ public class Maven {
     return locator.getService(RepositorySystem.class);
   }
 
-  public static DefaultRepositorySystemSession newRepositorySystemSession(RepositorySystem system) {
+  public DefaultRepositorySystemSession newRepositorySystemSession(RepositorySystem system) {
     DefaultRepositorySystemSession session = MavenRepositorySystemUtils.newSession();
 
     LocalRepository localRepo = new LocalRepository("target/local-repo");
@@ -88,9 +95,9 @@ public class Maven {
     return session;
   }
 
-  public static List<RemoteRepository> repositories() {
+  public List<RemoteRepository> repositories() {
     return ImmutableList.of(
-      new RemoteRepository.Builder("central", "default", "https://central.maven.org/maven2/")
+      new RemoteRepository.Builder("central", "default", repository)
         .build());
   }
 }

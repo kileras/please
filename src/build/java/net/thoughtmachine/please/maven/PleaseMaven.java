@@ -21,7 +21,10 @@ import org.kohsuke.args4j.Option;
 
 public class PleaseMaven {
 
-  @Option(name = "-x", usage = "Artifacts to exclude")
+  @Option(name = "-r", usage = "Repository to read from")
+  private String repository = "https://repo1.maven.org/maven2";
+
+  @Option(name = "-e", usage = "Artifacts to exclude")
   private List<String> excludeArtifact = new ArrayList<>();
 
   @Argument(usage = "<artifact id>")
@@ -45,8 +48,9 @@ public class PleaseMaven {
       System.exit(1);
     }
 
+    Maven maven = new Maven(repository);
     for (String artifactName : artifactNames) {
-      Set<Artifact> artifacts = Maven.transitiveDependencies(new DefaultArtifact(artifactName));
+      Set<Artifact> artifacts = maven.transitiveDependencies(new DefaultArtifact(artifactName));
       for (Artifact artifact : artifacts) {
         System.out.printf("%s:%s:%s\n", artifact.getGroupId(), artifact.getArtifactId(), artifact.getVersion());
       }
