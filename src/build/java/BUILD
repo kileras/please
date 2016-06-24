@@ -13,6 +13,7 @@ java_binary(
     deps = [
         '//src/build/java/net/thoughtmachine/please/maven',
     ],
+    visibility = ['PUBLIC'],
     self_executable = True,
 )
 
