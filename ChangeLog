@@ -1,9 +1,94 @@
 Version 4.0.0
 -------------
 
+    * Some rewrites of Go rules with several advantages:
+      - Now compatible with Go 1.7. Previously the linker would panic, apparently when doing
+        a dead code pass related to x/net/context. Still a little unsure of details.
+      - Should be faster, does some linking instead of copying & gives the compiler / linker
+        fewer directories to search.
+      - Compilation of binary / test code is separated from the linking step for better
+        incrementality.
+      There are some consequences from this:
+      - The gopath config entry must be set appropriately for libraries to be found.
+        Normally the defaults will be adequate here.
+      - Similarly, `src` subdirs are no longer implicitly searched in some circumstances.
+      - A go_binary rule must declare all dependencies used in its main package explicitly;
+        previously it was possible to pick them up transitively.
+      These will likely break some code that relied on the old behaviour; although such
+      code was probably technically incorrect, it's reasonable to consider this a breaking
+      change, hence the major version bump.
+    * Config options can be dynamically overridden on the command line,
+      e.g. `plz build -o go.version:1.7`
+
+
+Version 3.6.2
+-------------
+
+    * Remove undocumented skip_cache argument to build_rule; filegroups implicitly have this
+      and it's nicer not to expose it to anyone else.
+
+
+Version 3.6.1
+-------------
+
+    * Update SRCS for named sources as well as unnamed ones when affected by require/provide.
+    * Jarcat has an extra flag to allow renaming directories within a zip file (currently
+      not used by any builtin rules).
+
+Version 3.6.0
+-------------
+
+    * add a `src_dir` argument to java_library
+    * allow attaching deps to a remote_file
+    * fix `plz clean` background bug
+    * #107 Introduce https and mutual auth support to RPC cache
+    * #108 New query subcommand, `plz query whatoutputs`, which queries the current graph and returns the
+      target responsible for the provided file(s)
+
+
+Version 3.5.0
+-------------
+
+    * New command, `plz rebuild`, which behaves like `plz build` except that the named targets
+      (but not their dependencies) are always rebuilt.
+    * `remote_file` and `maven_jar` rules now print the URL before fetching, to make it a
+      bit easier to follow what they're actually trying to do if they fail.
+    * The Python hash seed is fixed before initialising the interpreter, so dict / set iteration
+      order should be deterministic between runs. The security implications aren't really a
+      concern in this context but repeatability is.
+
+
+Version 3.4.1
+-------------
+
+    * fix for type checking script when run through python3
+    * Don't try to retrieve results from containerised tests that have no_test_output = True.
+    * Private targets are omitted from `plz query somepath`.
+
+
+Version 3.4.0
+-------------
+
+    * `plz run` and `plz test` now default to the current package + subpackages when run
+      without arguments. `plz clean` and `plz query` still retain the old semantics of the
+      entire repo.
+
+
+Version 3.3.0
+-------------
+
     * Build / test commands are now run with "-o pipefail" so you don't have to specify
       yourself. This could potentially break any rules that relied on the default
       behaviour although it's unlikely that anything did that deliberately.
+    * Sources are deduplicated on build rules.
+    * Fixed a minor bug where plz run would incorrectly pass the --assert_version flag to
+      the target if it updated automatically.
+    * RPC cache now gives up after a sufficient number of failures so it doesn't drown
+      you in messages on long builds.
+    * If any of the entries in `srcs` in a build rule are None, they're skipped. This makes
+      it easier to write some rules with optional inputs.
+    * Added a config property for the default maven repo.
+    * Output file from java_binary is now configurable.
 
 
 Version 3.2.0

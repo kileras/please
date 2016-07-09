@@ -18,6 +18,7 @@ package parse
 import (
 	"crypto/sha1"
 	"fmt"
+	"os"
 	"path"
 	"runtime"
 	"sort"
@@ -58,6 +59,11 @@ func initializeInterpreter(config *core.Configuration) {
 	// its initialisation. Force it to stay on this one thread for now.
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
+
+	// Set the hash seed for Python dicts / sets; there isn't a DoS security concern in our context,
+	// and it's much more useful to us that they are consistent between runs since it's not that hard
+	// to accidentally write rules that are nondeterministic via {}.items() etc.
+	os.Setenv("PYTHONHASHSEED", "42")
 
 	// If an engine has been explicitly set, by flag or config, we honour it here.
 	if config.Please.ParserEngine != "" {
@@ -259,7 +265,7 @@ func IsValidTargetName(name *C.char) bool {
 
 //export AddTarget
 func AddTarget(pkgPtr uintptr, cName, cCmd, cTestCmd *C.char, binary, test, needsTransitiveDeps,
-	outputIsComplete, containerise, noTestOutput, skipCache, testOnly, stamp bool,
+	outputIsComplete, containerise, noTestOutput, testOnly, stamp bool,
 	flakiness, buildTimeout, testTimeout int, cBuildingDescription *C.char) (ret C.size_t) {
 	buildingDescription := ""
 	if cBuildingDescription != nil {
@@ -267,13 +273,13 @@ func AddTarget(pkgPtr uintptr, cName, cCmd, cTestCmd *C.char, binary, test, need
 	}
 	return sizet(addTarget(pkgPtr, C.GoString(cName), C.GoString(cCmd), C.GoString(cTestCmd),
 		binary, test, needsTransitiveDeps, outputIsComplete, containerise, noTestOutput,
-		skipCache, testOnly, stamp, flakiness, buildTimeout, testTimeout, buildingDescription))
+		testOnly, stamp, flakiness, buildTimeout, testTimeout, buildingDescription))
 }
 
 // addTarget adds a new build target to the graph.
 // Separated from AddTarget to make it possible to test (since you can't mix cgo and go test).
 func addTarget(pkgPtr uintptr, name, cmd, testCmd string, binary, test, needsTransitiveDeps,
-	outputIsComplete, containerise, noTestOutput, skipCache, testOnly, stamp bool,
+	outputIsComplete, containerise, noTestOutput, testOnly, stamp bool,
 	flakiness, buildTimeout, testTimeout int, buildingDescription string) *core.BuildTarget {
 	pkg := unsizep(pkgPtr)
 	target := core.NewBuildTarget(core.NewBuildLabel(pkg.Name, name))
@@ -283,7 +289,6 @@ func addTarget(pkgPtr uintptr, name, cmd, testCmd string, binary, test, needsTra
 	target.OutputIsComplete = outputIsComplete
 	target.Containerise = containerise
 	target.NoTestOutput = noTestOutput
-	target.SkipCache = skipCache
 	target.TestOnly = testOnly
 	target.Flakiness = flakiness
 	target.BuildTimeout = buildTimeout

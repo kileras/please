@@ -6,7 +6,8 @@ the complex build environment C++ has, so some issues may remain.
 
 
 def cc_library(name, srcs=None, hdrs=None, private_hdrs=None, deps=None, visibility=None, test_only=False,
-               compiler_flags=None, linker_flags=None, pkg_config_libs=None, includes=None, defines=None):
+               compiler_flags=None, linker_flags=None, pkg_config_libs=None, includes=None, defines=None,
+               alwayslink=False):
     """Generate a C++ library target.
 
     Args:
@@ -26,6 +27,9 @@ def cc_library(name, srcs=None, hdrs=None, private_hdrs=None, deps=None, visibil
                               will be picked up by cc_binary or cc_test rules.
       includes (list): List of include directories to be added to the compiler's path.
       defines (list): List of tokens to define in the preprocessor.
+      alwayslink (bool): If True, any binaries / tests using this library will link in all symbols,
+                         even if they don't directly reference them. This is useful for e.g. having
+                         static members that register themselves at construction time.
     """
     srcs = srcs or []
     hdrs = hdrs or []
@@ -87,21 +91,10 @@ def cc_library(name, srcs=None, hdrs=None, private_hdrs=None, deps=None, visibil
             pre_build=_apply_transitive_labels(cmds, link=False, archive=True),
         )
         a_rules.append(':' + a_name)
-    # Combine the archives into one, if there's more than one.
-    if len(a_rules) > 1:
-        a_name = '_%s#a' % name
-        build_rule(
-            name=a_name,
-            srcs=a_rules,
-            outs=[name + '.a'],
-            cmd='ls ${PKG}/*.a | xargs -n 1 %s x && %s rcs%s $OUT ${PKG}/*.o' %
-                (CONFIG.AR_TOOL, CONFIG.AR_TOOL, _AR_FLAG),
-            building_description='Archiving...',
-            test_only=test_only,
-            labels=labels,
-            output_is_complete=True,
-        )
-        a_rules = [':' + a_name]
+        if alwayslink:
+            labels.append('cc:al:%s/%s' % (get_base_path(), a_name + '.a'))
+    # TODO(pebers): it would be nice to combine multiple .a files into one here,
+    #               it'd be easier for other rules to handle in a sensible way.
     hdrs_rule = ':_%s#hdrs' % name
     filegroup(
         name=name,
@@ -313,6 +306,7 @@ def cc_test(name, srcs=None, hdrs=None, compiler_flags=None, linker_flags=None, 
             deps=deps,
             compiler_flags=compiler_flags,
             test_only=True,
+            alwayslink=True,
         )
         deps = deps or []
         deps.append(':_%s#lib' % name)
@@ -323,7 +317,7 @@ def cc_test(name, srcs=None, hdrs=None, compiler_flags=None, linker_flags=None, 
         data=data,
         visibility=visibility,
         cmd=cmd,
-        test_cmd='$(exe :%s) > test.results' % name,
+        test_cmd='$(exe :%s) | tee test.results' % name,
         building_description='Linking...',
         binary=True,
         test=True,
@@ -491,7 +485,13 @@ def _build_flags(compiler_flags, linker_flags, pkg_config_libs, pkg_config_cflag
     linker_flags = ['-Xlinker ' + flag for flag in (linker_flags or [])]
     pkg_config_cmd = ' '.join('`pkg-config --cflags --libs %s`' % x for x in pkg_config_libs or [])
     pkg_config_cmd_2 = ' '.join('`pkg-config --cflags %s`' % x for x in pkg_config_cflags or [])
-    objs = '-Wl,--start-group `find . -name "*.o" -or -name "*.a" | sort` -Wl,--end-group' if binary else ''
+    objs = '`find . -name "*.o" -or -name "*.a" | sort`' if binary else ''
+    if binary and CONFIG.OS != 'darwin':
+        # We don't order libraries in a way that is especially useful for the linker, which is
+        # nicely solved by --start-group / --end-group. Unfortunately the OSX linker doesn't
+        # support those flags; in many cases it will work without, so try that.
+        # Ordering them would be ideal but we lack a convenient way of working that out from here.
+        objs = '-Wl,--start-group %s -Wl,--end-group' % objs
     return ' '.join([' '.join(compiler_flags), objs, ' '.join(linker_flags), pkg_config_cmd, pkg_config_cmd_2])
 
 
@@ -513,6 +513,12 @@ def _apply_transitive_labels(command_map, link=True, archive=False):
         if link:
             flags += ' '.join('-Xlinker ' + l[3:] for l in labels if l.startswith('ld:'))
             flags += ' '.join('`pkg-config --libs %s`' % l[3:] for l in labels if l.startswith('pc:'))
+            alwayslink = ' '.join(l[3:] for l in labels if l.startswith('al:'))
+            if alwayslink:
+                alwayslink = ' -Wl,--whole-archive %s -Wl,--no-whole-archive ' % alwayslink
+                for k, v in command_map.items():
+                    # These need to come *before* the others but within the group flags...
+                    command_map[k] = v.replace('`find', alwayslink + '`find')
         if archive:
             flags += ar_cmd
         set_command(name, 'dbg', command_map['dbg'] + ' ' + flags)

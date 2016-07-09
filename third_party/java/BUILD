@@ -66,8 +66,9 @@ maven_jar(
 
 maven_jar(
     name = 'protobuf',
-    id = 'com.google.protobuf:protobuf-java:3.0.0-beta-1',
-    hash = 'b832e95bd94c68a01c32985d99ca5bb74bb0e0dc',
+    id = 'com.google.protobuf:protobuf-java:3.0.0-beta-3',
+    hash = 'ed118aa0276005ca49b18a3a2b77eaacdec95680',
+    sources = False,
 )
 
 # These are dependencies of please_maven, so of course we can't fetch them with maven_jars :(

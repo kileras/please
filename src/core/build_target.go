@@ -16,9 +16,11 @@ const TmpDir string = "plz-out/tmp"
 const GenDir string = "plz-out/gen"
 const BinDir string = "plz-out/bin"
 
-// Placeholder commands for filegroups.
+// Placeholder command for filegroups.
 const filegroupCommand = "__FILEGROUP__"
-const linkFilegroupCommand = "__LINK_FILEGROUP__"
+
+// Default when this isn't otherwise specified.
+const DefaultBuildingDescription = "Building..."
 
 // Representation of a build target and all information about it;
 // its name, dependencies, build commands, etc.
@@ -107,10 +109,6 @@ type BuildTarget struct {
 	// Timeouts for build/test actions, in seconds.
 	BuildTimeout int
 	TestTimeout  int
-	// Indication that we should skip caching this rule. This shouldn't be used as an out for
-	// making targets indeterminate, it's a hint for rules like filegroup which simply symlink
-	// their inputs - so it's faster to relink them than copying their contents.
-	SkipCache bool
 	// Indicates that the target can only be depended on by tests or other rules with this set.
 	// Used to restrict non-deployable code and also affects coverage detection.
 	TestOnly bool
@@ -208,7 +206,7 @@ func NewBuildTarget(label BuildLabel) *BuildTarget {
 	target.state = int32(Inactive)
 	target.IsBinary = false
 	target.IsTest = false
-	target.BuildingDescription = "Building..."
+	target.BuildingDescription = DefaultBuildingDescription
 	return target
 }
 
@@ -239,21 +237,11 @@ func (target *BuildTarget) TestDir() string {
 	return path.Join(TmpDir, target.Label.PackageName, target.Label.Name+"#.test")
 }
 
-// Returns all the source paths for this target
+// AllSourcePaths returns all the source paths for this target
 func (target *BuildTarget) AllSourcePaths(graph *BuildGraph) []string {
 	ret := make([]string, 0, len(target.Sources))
 	for _, source := range target.AllSources() {
-		if label := source.Label(); label != nil {
-			for _, providedLabel := range graph.TargetOrDie(*label).ProvideFor(target) {
-				for _, file := range providedLabel.Paths(graph) {
-					ret = append(ret, file)
-				}
-			}
-		} else {
-			for _, file := range source.Paths(graph) {
-				ret = append(ret, file)
-			}
-		}
+		ret = append(ret, target.sourcePaths(graph, source)...)
 	}
 	return ret
 }
@@ -338,11 +326,23 @@ func (target *BuildTarget) findOutputTarget(label BuildLabel, out string) []stri
 func (target *BuildTarget) SourcePaths(graph *BuildGraph, sources []BuildInput) []string {
 	ret := make([]string, 0, len(sources))
 	for _, source := range sources {
-		for _, file := range source.Paths(graph) {
-			ret = append(ret, file)
-		}
+		ret = append(ret, target.sourcePaths(graph, source)...)
 	}
 	return ret
+}
+
+// sourcePaths returns the source paths for a single source.
+func (target *BuildTarget) sourcePaths(graph *BuildGraph, source BuildInput) []string {
+	if label := source.Label(); label != nil {
+		ret := []string{}
+		for _, providedLabel := range graph.TargetOrDie(*label).ProvideFor(target) {
+			for _, file := range providedLabel.Paths(graph) {
+				ret = append(ret, file)
+			}
+		}
+		return ret
+	}
+	return source.Paths(graph)
 }
 
 // allDepsBuilt returns true if all the dependencies of a target are built.
@@ -715,12 +715,7 @@ func (target *BuildTarget) Parent(graph *BuildGraph) *BuildTarget {
 
 // IsFilegroup returns true if this target is a filegroup rule.
 func (target *BuildTarget) IsFilegroup() bool {
-	return target.Command == filegroupCommand || target.Command == linkFilegroupCommand
-}
-
-// IsLinkFilegroup returns true if this target is a filegroup rule that links its outputs.
-func (target *BuildTarget) IsLinkFilegroup() bool {
-	return target.Command == linkFilegroupCommand
+	return target.Command == filegroupCommand
 }
 
 // Make slices of these guys sortable.
