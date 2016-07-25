@@ -19,6 +19,7 @@ import (
 
 	"build"
 	"core"
+	"test"
 )
 
 var startTime = time.Now()
@@ -76,13 +77,13 @@ func MonitorState(state *core.BuildState, numThreads int, plainOutput, keepGoing
 		}
 		// Die immediately and unsuccessfully, this avoids awkward interactions with
 		// --failing_tests_ok later on.
-		os.Exit(1)
+		os.Exit(-1)
 	}
 	// Check all the targets we wanted to build actually have been built.
 	for _, label := range state.ExpandOriginalTargets() {
 		if target := state.Graph.Target(label); target == nil {
 			log.Fatalf("Target %s doesn't exist in build graph", label)
-		} else if state.NeedHashesOnly && target.State() == core.Stopped {
+		} else if (state.NeedHashesOnly || state.PrepareOnly) && target.State() == core.Stopped {
 			// Do nothing, we will output about this shortly.
 		} else if shouldBuild && target != nil && target.State() < core.Built && len(failedTargetMap) == 0 {
 			cycle := graphCycleMessage(state.Graph, target)
@@ -94,6 +95,8 @@ func MonitorState(state *core.BuildState, numThreads int, plainOutput, keepGoing
 			printTestResults(state.Graph, aggregatedResults, failedTargets, duration)
 		} else if state.NeedHashesOnly {
 			printHashes(state, duration)
+		} else if state.PrepareOnly {
+			printTempDirs(state, duration)
 		} else { // Must be plz build or similar, report build outputs.
 			printBuildResults(state, duration)
 		}
@@ -265,6 +268,15 @@ func printHashes(state *core.BuildState, duration float64) {
 	}
 }
 
+func printTempDirs(state *core.BuildState, duration float64) {
+	fmt.Printf("Temp directories prepared, total time %0.2fs:\n", duration)
+	for _, label := range state.ExpandOriginalTargets() {
+		target := state.Graph.TargetOrDie(label)
+		fmt.Printf("  %s: %s\n", label, target.TmpDir())
+		fmt.Printf("    Command: %s\n", build.ReplaceSequences(target, target.Command))
+	}
+}
+
 func buildResult(target *core.BuildTarget) []string {
 	results := []string{}
 	if target != nil {
@@ -397,7 +409,7 @@ func PrintCoverage(state *core.BuildState, includeFiles []string) {
 			printf("${WHITE}%s:${RESET}\n", strings.TrimRight(dir, "/"))
 		}
 		lastDir = dir
-		covered, total := countCoverage(state.Coverage.Files[file])
+		covered, total := test.CountCoverage(state.Coverage.Files[file])
 		printf("  %s\n", coveragePercentage(covered, total, file[len(dir)+1:]))
 		totalCovered += covered
 		totalTotal += total
@@ -420,7 +432,7 @@ func PrintLineCoverageReport(state *core.BuildState, includeFiles []string) {
 			continue
 		}
 		coverage := state.Coverage.Files[file]
-		covered, total := countCoverage(coverage)
+		covered, total := test.CountCoverage(coverage)
 		printf("${BOLD_WHITE}%s: %s${RESET}\n", file, coveragePercentage(covered, total, ""))
 		f, err := os.Open(file)
 		if err != nil {
@@ -454,21 +466,6 @@ func shouldInclude(file string, files []string) bool {
 		}
 	}
 	return false
-}
-
-// countCoverage counts the number of lines covered and the total number coverable in a single file.
-func countCoverage(lines []core.LineCoverage) (int, int) {
-	covered := 0
-	total := 0
-	for _, line := range lines {
-		if line == core.Covered {
-			total++
-			covered++
-		} else if line != core.NotExecutable {
-			total++
-		}
-	}
-	return covered, total
 }
 
 // Returns some appropriate ANSI colour code for a coverage percentage.

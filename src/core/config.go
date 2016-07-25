@@ -75,15 +75,6 @@ func ReadConfigFiles(filenames []string) (*Configuration, error) {
 	if (config.Cache.RpcPrivateKey == "") != (config.Cache.RpcPublicKey == "") {
 		return config, fmt.Errorf("Must pass both rpcprivatekey and rpcpublickey properties for cache")
 	}
-
-	// TODO(pebers): Remove in please v4.0+
-	if len(config.Please.PyPyLocation) > 0 {
-		log.Warning("pypylocation config property is deprecated and will go away soon")
-	}
-	if config.Java.JarTool != "" {
-		log.Warning("jartool config property is deprecated and will go away soon")
-	}
-
 	return config, nil
 }
 
@@ -134,6 +125,7 @@ func DefaultConfiguration() *Configuration {
 	config.Java.SourceLevel = "8"
 	config.Java.TargetLevel = "8"
 	config.Java.DefaultMavenRepo = "https://repo1.maven.org/maven2"
+	config.Java.JavacFlags = "-Werror -Xlint:-options" // bootstrap class path warnings are pervasive without this.
 	config.Cpp.CCTool = "g++"
 	config.Cpp.LdTool = "ld"
 	config.Cpp.ArTool = "ar"
@@ -143,6 +135,7 @@ func DefaultConfiguration() *Configuration {
 	config.Proto.ProtocGoPlugin = "`which protoc-gen-go`" // These seem to need absolute paths
 	config.Proto.GrpcPythonPlugin = "`which protoc-gen-grpc-python`"
 	config.Proto.GrpcJavaPlugin = "`which protoc-gen-grpc-java`"
+	config.Proto.GrpcCCPlugin = "`which grpc_cpp_plugin`"
 	config.Proto.ProtocVersion = ""
 	config.Proto.PythonDep = "//third_party/python:protobuf"
 	config.Proto.JavaDep = "//third_party/java:protobuf"
@@ -229,6 +222,8 @@ type Configuration struct {
 		DefaultTestPackage string
 		SourceLevel        string
 		TargetLevel        string
+		JavacFlags         string
+		JavacTestFlags     string
 		DefaultMavenRepo   string
 	}
 	Cpp struct {
@@ -245,6 +240,7 @@ type Configuration struct {
 		ProtocGoPlugin   string
 		GrpcPythonPlugin string
 		GrpcJavaPlugin   string
+		GrpcCCPlugin     string
 		Language         []string
 		ProtocVersion    string
 		PythonDep        string

@@ -24,6 +24,7 @@ import (
 	"test"
 	"update"
 	"utils"
+	"watch"
 )
 
 var log = logging.MustGetLogger("plz")
@@ -68,7 +69,8 @@ var opts struct {
 	NoCacheCleaner   bool   `description:"Don't start a cleaning process for the directory cache" no-flag:"true"`
 
 	Build struct {
-		Args struct { // Inner nesting is necessary to make positional-args work :(
+		Prepare bool     `long:"prepare" description:"Prepare build directory for these targets but don't build them."`
+		Args    struct { // Inner nesting is necessary to make positional-args work :(
 			Targets []core.BuildLabel `positional-arg-name:"targets" description:"Targets to build"`
 		} `positional-args:"true" required:"true"`
 	} `command:"build" description:"Builds one or more targets"`
@@ -86,7 +88,7 @@ var opts struct {
 	} `command:"hash" description:"Calculates hash for one or more targets"`
 
 	Test struct {
-		FailingTestsOk  bool   `long:"failing_tests_ok" description:"Exit with status 0 even if tests fail (nonzero only if catastrophe happens)"`
+		FailingTestsOk  bool   `long:"failing_tests_ok" hidden:"true" description:"Exit with status 0 even if tests fail (nonzero only if catastrophe happens)"`
 		NumRuns         int    `long:"num_runs" short:"n" description:"Number of times to run each test target."`
 		TestResultsFile string `long:"test_results_file" default:"plz-out/log/test_results.xml" description:"File to write combined test results to."`
 		// Slightly awkward since we can specify a single test with arguments or multiple test targets.
@@ -97,7 +99,7 @@ var opts struct {
 	} `command:"test" description:"Builds and tests one or more targets"`
 
 	Cover struct {
-		FailingTestsOk      bool     `long:"failing_tests_ok" description:"Exit with status 0 even if tests fail (nonzero only if catastrophe happens)"`
+		FailingTestsOk      bool     `long:"failing_tests_ok" hidden:"true" description:"Exit with status 0 even if tests fail (nonzero only if catastrophe happens)"`
 		NoCoverageReport    bool     `long:"nocoverage_report" description:"Suppress the per-file coverage report displayed in the shell"`
 		LineCoverageReport  bool     `short:"l" long:"line_coverage_report" description:" Show a line-by-line coverage report for all affected files."`
 		NumRuns             int      `short:"n" long:"num_runs" description:"Number of times to run each test target."`
@@ -124,6 +126,12 @@ var opts struct {
 			Targets []core.BuildLabel `positional-arg-name:"targets" description:"Targets to clean (default is to clean everything)"`
 		} `positional-args:"true"`
 	} `command:"clean" description:"Cleans build artifacts" subcommands-optional:"true"`
+
+	Watch struct {
+		Args struct {
+			Targets []core.BuildLabel `positional-arg-name:"targets" required:"true" description:"Targets to watch the sources of for changes"`
+		} `positional-args:"true" required:"true"`
+	} `command:"watch" description:"Watches sources of targets for changes and rebuilds them"`
 
 	Update struct {
 	} `command:"update" description:"Checks for an update and updates if needed."`
@@ -266,6 +274,13 @@ var buildFunctions = map[string]func() bool{
 			return true
 		}
 		return false
+	},
+	"watch": func() bool {
+		success, state := runBuild(opts.Watch.Args.Targets, false, false, false)
+		if success {
+			watch.Watch(state, state.ExpandOriginalTargets())
+		}
+		return success
 	},
 	"update": func() bool {
 		log.Info("Up to date.")
@@ -428,6 +443,7 @@ func Please(targets []core.BuildLabel, config *core.Configuration, prettyOutput,
 	state.NeedBuild = shouldBuild
 	state.NeedTests = shouldTest
 	state.NeedHashesOnly = len(opts.Hash.Args.Targets) > 0
+	state.PrepareOnly = opts.Build.Prepare
 	state.PrintCommands = opts.OutputFlags.PrintCommands
 	state.CleanWorkdirs = !opts.FeatureFlags.KeepWorkdirs
 	state.ForceRebuild = len(opts.Rebuild.Args.Targets) > 0
@@ -605,6 +621,6 @@ func main() {
 	}
 
 	if !buildFunctions[command]() {
-		os.Exit(1)
+		os.Exit(7) // Something distinctive, is sometimes useful to identify this externally.
 	}
 }

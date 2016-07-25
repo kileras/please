@@ -38,6 +38,7 @@
 package build
 
 import (
+	"encoding/base64"
 	"fmt"
 	"path"
 	"path/filepath"
@@ -53,6 +54,7 @@ var exeReplacement = regexp.MustCompile("\\$\\(exe ([^\\)]+)\\)")
 var outExeReplacement = regexp.MustCompile("\\$\\(out_exe ([^\\)]+)\\)")
 var outReplacement = regexp.MustCompile("\\$\\(out_location ([^\\)]+)\\)")
 var dirReplacement = regexp.MustCompile("\\$\\(dir ([^\\)]+)\\)")
+var hashReplacement = regexp.MustCompile("\\$\\(hash ([^\\)]+)\\)")
 
 // Replace escape sequences in the target's command.
 // For example, $(location :blah) -> the output of rule blah.
@@ -76,46 +78,66 @@ func ReplaceTestSequences(target *core.BuildTarget, command string) string {
 
 func replaceSequencesInternal(target *core.BuildTarget, command string, test bool) string {
 	cmd := locationReplacement.ReplaceAllStringFunc(command, func(in string) string {
-		return replaceSequence(target, in[11:len(in)-1], false, false, false, false, test)
+		return replaceSequence(target, in[11:len(in)-1], false, false, false, false, false, test)
 	})
 	cmd = locationsReplacement.ReplaceAllStringFunc(cmd, func(in string) string {
-		return replaceSequence(target, in[12:len(in)-1], false, true, false, false, test)
+		return replaceSequence(target, in[12:len(in)-1], false, true, false, false, false, test)
 	})
 	cmd = exeReplacement.ReplaceAllStringFunc(cmd, func(in string) string {
-		return replaceSequence(target, in[6:len(in)-1], true, false, false, false, test)
+		return replaceSequence(target, in[6:len(in)-1], true, false, false, false, false, test)
 	})
 	cmd = outReplacement.ReplaceAllStringFunc(cmd, func(in string) string {
-		return replaceSequence(target, in[15:len(in)-1], false, false, false, true, test)
+		return replaceSequence(target, in[15:len(in)-1], false, false, false, true, false, test)
 	})
 	cmd = outExeReplacement.ReplaceAllStringFunc(cmd, func(in string) string {
-		return replaceSequence(target, in[10:len(in)-1], true, false, false, true, test)
+		return replaceSequence(target, in[10:len(in)-1], true, false, false, true, false, test)
 	})
 	cmd = dirReplacement.ReplaceAllStringFunc(cmd, func(in string) string {
-		return replaceSequence(target, in[6:len(in)-1], false, true, true, false, test)
+		return replaceSequence(target, in[6:len(in)-1], false, true, true, false, false, test)
 	})
+	cmd = hashReplacement.ReplaceAllStringFunc(cmd, func(in string) string {
+		if !target.Stamp {
+			panic(fmt.Sprintf("Target %s can't use $(hash ) replacements without stamp=True", target.Label))
+		}
+		return replaceSequence(target, in[7:len(in)-1], false, true, true, false, true, test)
+	})
+	if core.State.Config.Bazel.Compatibility {
+		// Bazel allows several obscure Make-style variable expansions.
+		// Our replacement here is not very principled but should work better than not doing it at all.
+		cmd = strings.Replace(cmd, "$<", "$SRCS", -1)
+		cmd = strings.Replace(cmd, "$(<)", "$SRCS", -1)
+		cmd = strings.Replace(cmd, "$@D", "$TMP_DIR", -1)
+		cmd = strings.Replace(cmd, "$(@D)", "$TMP_DIR", -1)
+		cmd = strings.Replace(cmd, "$@", "$OUTS", -1)
+		cmd = strings.Replace(cmd, "$(@)", "$OUTS", -1)
+		// It also seemingly allows you to get away with this syntax, which means something
+		// fairly different in Bash, but never mind.
+		cmd = strings.Replace(cmd, "$(SRCS)", "$SRCS", -1)
+		cmd = strings.Replace(cmd, "$(OUTS)", "$OUTS", -1)
+	}
 	// We would ideally check for this when doing matches above, but not easy in
 	// Go since its regular expressions are actually regular and principled.
 	return strings.Replace(cmd, "\\$", "$", -1)
 }
 
 // Replaces a single escape sequence in a command.
-func replaceSequence(target *core.BuildTarget, in string, runnable, multiple, dir, outPrefix, test bool) string {
+func replaceSequence(target *core.BuildTarget, in string, runnable, multiple, dir, outPrefix, hash, test bool) string {
 	if core.LooksLikeABuildLabel(in) {
 		label := core.ParseBuildLabel(in, target.Label.PackageName)
-		return replaceSequenceLabel(target, label, in, runnable, multiple, dir, outPrefix, test, true)
+		return replaceSequenceLabel(target, label, in, runnable, multiple, dir, outPrefix, hash, test, true)
 	}
 	for _, src := range target.AllSources() {
 		if label := src.Label(); label != nil && src.String() == in {
-			return replaceSequenceLabel(target, *label, in, runnable, multiple, dir, outPrefix, test, false)
+			return replaceSequenceLabel(target, *label, in, runnable, multiple, dir, outPrefix, hash, test, false)
 		}
 	}
 	return quote(path.Join(target.Label.PackageName, in))
 }
 
-func replaceSequenceLabel(target *core.BuildTarget, label core.BuildLabel, in string, runnable, multiple, dir, outPrefix, test, allOutputs bool) string {
+func replaceSequenceLabel(target *core.BuildTarget, label core.BuildLabel, in string, runnable, multiple, dir, outPrefix, hash, test, allOutputs bool) string {
 	// Check this label is a dependency of the target, otherwise it's not allowed.
 	if label == target.Label { // targets can always use themselves.
-		return checkAndReplaceSequence(target, target, in, runnable, multiple, dir, outPrefix, test, allOutputs, false)
+		return checkAndReplaceSequence(target, target, in, runnable, multiple, dir, outPrefix, hash, test, allOutputs, false)
 	}
 	deps := target.DependenciesFor(label)
 	if len(deps) == 0 {
@@ -123,10 +145,10 @@ func replaceSequenceLabel(target *core.BuildTarget, label core.BuildLabel, in st
 	}
 	// TODO(pebers): this does not correctly handle the case where there are multiple deps here
 	//               (but is better than the previous case where it never worked at all)
-	return checkAndReplaceSequence(target, deps[0], in, runnable, multiple, dir, outPrefix, test, allOutputs, target.IsTool(label))
+	return checkAndReplaceSequence(target, deps[0], in, runnable, multiple, dir, outPrefix, hash, test, allOutputs, target.IsTool(label))
 }
 
-func checkAndReplaceSequence(target, dep *core.BuildTarget, in string, runnable, multiple, dir, outPrefix, test, allOutputs, tool bool) string {
+func checkAndReplaceSequence(target, dep *core.BuildTarget, in string, runnable, multiple, dir, outPrefix, hash, test, allOutputs, tool bool) string {
 	if allOutputs && !multiple && len(dep.Outputs()) != 1 {
 		// Label must have only one output.
 		panic(fmt.Sprintf("Rule %s can't use %s; %s has multiple outputs.", target.Label, in, dep.Label))
@@ -134,6 +156,9 @@ func checkAndReplaceSequence(target, dep *core.BuildTarget, in string, runnable,
 		panic(fmt.Sprintf("Rule %s can't $(exe %s), it's not executable", target.Label, dep.Label))
 	} else if runnable && len(dep.Outputs()) == 0 {
 		panic(fmt.Sprintf("Rule %s is tagged as binary but produces no output.", dep.Label))
+	}
+	if hash {
+		return base64.RawURLEncoding.EncodeToString(mustShortTargetHash(core.State, dep))
 	}
 	output := ""
 	for _, out := range dep.Outputs() {

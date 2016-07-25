@@ -65,7 +65,7 @@ maven_jar(
     deps = [
         ':logback-core',
         ':slf4j-api',
-    ]
+    ],
 )
 
 maven_jar(

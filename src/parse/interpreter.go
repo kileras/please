@@ -94,6 +94,8 @@ func initializeInterpreter(config *core.Configuration) {
 	setConfigValue("PLEASE_MAVEN_TOOL", config.Java.PleaseMavenTool)
 	setConfigValue("JAVA_SOURCE_LEVEL", config.Java.SourceLevel)
 	setConfigValue("JAVA_TARGET_LEVEL", config.Java.TargetLevel)
+	setConfigValue("JAVAC_FLAGS", config.Java.JavacFlags)
+	setConfigValue("JAVAC_TEST_FLAGS", config.Java.JavacTestFlags)
 	setConfigValue("DEFAULT_MAVEN_REPO", config.Java.DefaultMavenRepo)
 	setConfigValue("CC_TOOL", config.Cpp.CCTool)
 	setConfigValue("LD_TOOL", config.Cpp.LdTool)
@@ -111,6 +113,7 @@ func initializeInterpreter(config *core.Configuration) {
 	setConfigValue("PROTOC_GO_PLUGIN", config.Proto.ProtocGoPlugin)
 	setConfigValue("GRPC_PYTHON_PLUGIN", config.Proto.GrpcPythonPlugin)
 	setConfigValue("GRPC_JAVA_PLUGIN", config.Proto.GrpcJavaPlugin)
+	setConfigValue("GRPC_CC_PLUGIN", config.Proto.GrpcCCPlugin)
 	setConfigValue("PROTOC_VERSION", config.Proto.ProtocVersion)
 	setConfigValue("PROTO_PYTHON_DEP", config.Proto.PythonDep)
 	setConfigValue("PROTO_JAVA_DEP", config.Proto.JavaDep)
@@ -352,6 +355,8 @@ func AddDependency(cPackage uintptr, cTarget *C.char, cDep *C.char, exported boo
 		return C.CString(err.Error())
 	}
 	target.AddMaybeExportedDependency(dep, exported)
+	// Note that here we're in a post-build function so we must call this explicitly
+	// (in other callbacks it's handled after the package parses all at once).
 	core.State.Graph.AddDependency(target.Label, dep)
 	return nil
 }
@@ -601,13 +606,11 @@ func SetContainerSetting(cTarget uintptr, cName, cValue *C.char) *C.char {
 // We use in-band signalling for some errors since C can't handle multiple return values :)
 //export GetIncludeFile
 func GetIncludeFile(cPackage uintptr, cLabel *C.char) *C.char {
-	pkg := unsizep(cPackage)
 	label := C.GoString(cLabel)
 	if !strings.HasPrefix(label, "//") {
 		return C.CString("__include_defs argument must be an absolute path (ie. start with //)")
 	}
 	relPath := strings.TrimLeft(label, "/")
-	pkg.RegisterSubinclude(relPath)
 	return C.CString(path.Join(core.RepoRoot, relPath))
 }
 
@@ -645,6 +648,7 @@ func getSubincludeFile(pkg *core.Package, labelStr string) string {
 			return pyDeferParse // Again, they'll have to wait for this guy to build.
 		}
 	}
+	pkg.RegisterSubinclude(target.Label)
 	// Well if we made it to here it's actually ready to go, so tell them where to get it.
 	return path.Join(target.OutDir(), target.Outputs()[0])
 }

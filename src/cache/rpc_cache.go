@@ -123,7 +123,7 @@ func (cache *rpcCache) Retrieve(target *core.BuildTarget, key []byte) bool {
 	if len(req.Artifacts) == 0 {
 		return false
 	}
-	return cache.retrieveArtifacts(target, &req)
+	return cache.retrieveArtifacts(target, &req, true)
 }
 
 func (cache *rpcCache) RetrieveExtra(target *core.BuildTarget, key []byte, file string) bool {
@@ -133,10 +133,10 @@ func (cache *rpcCache) RetrieveExtra(target *core.BuildTarget, key []byte, file 
 	artifact := pb.Artifact{Package: target.Label.PackageName, Target: target.Label.Name, File: file}
 	artifacts := []*pb.Artifact{&artifact}
 	req := pb.RetrieveRequest{Hash: key, Os: runtime.GOOS, Arch: runtime.GOARCH, Artifacts: artifacts}
-	return cache.retrieveArtifacts(target, &req)
+	return cache.retrieveArtifacts(target, &req, false)
 }
 
-func (cache *rpcCache) retrieveArtifacts(target *core.BuildTarget, req *pb.RetrieveRequest) bool {
+func (cache *rpcCache) retrieveArtifacts(target *core.BuildTarget, req *pb.RetrieveRequest, remove bool) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), cache.timeout)
 	defer cancel()
 	response, err := cache.client.Retrieve(ctx, req)
@@ -148,6 +148,18 @@ func (cache *rpcCache) retrieveArtifacts(target *core.BuildTarget, req *pb.Retri
 		// Quiet, this is almost certainly just a 'not found'
 		log.Debug("Couldn't retrieve artifacts for %s [key %s] from RPC cache", target.Label, base64.RawURLEncoding.EncodeToString(req.Hash))
 		return false
+	}
+	// Remove any existing outputs first; this is important for cases where the output is a
+	// directory, because we get back individual artifacts, and we need to make sure that
+	// only the retrieved artifacts are present in the output.
+	if remove {
+		for _, out := range target.Outputs() {
+			out := path.Join(target.OutDir(), out)
+			if err := os.RemoveAll(out); err != nil {
+				log.Error("Failed to remove artifact %s: %s", out, err)
+				return false
+			}
+		}
 	}
 	for _, artifact := range response.Artifacts {
 		if !cache.writeFile(target, artifact.File, artifact.Body) {
@@ -244,7 +256,7 @@ func (cache *rpcCache) isConnected() bool {
 // (it's unlikely to restart in time if it's got a nontrivial set of artifacts to scan) and
 // the user has probably been pestered by enough messages already.
 func (cache *rpcCache) error() {
-	if atomic.AddInt32(&cache.numErrors, 1) >= maxErrors {
+	if atomic.AddInt32(&cache.numErrors, 1) >= maxErrors && cache.Connected {
 		log.Warning("Disabling RPC cache, looks like the connection has been lost")
 		cache.Connected = false
 	}

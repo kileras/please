@@ -35,7 +35,8 @@ _GO_LIBRARY_CMDS = {
     'cover': '%(link_cmd)s && %(cover_cmd)s && %(compile_cmd)s $SRCS' % _ALL_GO_LIBRARY_CMDS,
 }
 
-def go_library(name, srcs, out=None, deps=None, visibility=None, test_only=False, go_tools=None):
+def go_library(name, srcs, out=None, deps=None, visibility=None, test_only=False,
+               go_tools=None, _needs_transitive_deps=False):
     """Generates a Go library which can be reused by other rules.
 
     Args:
@@ -82,6 +83,7 @@ def go_library(name, srcs, out=None, deps=None, visibility=None, test_only=False
         provides={'go': ':' + name, 'go_src': ':_%s#srcs' % name},
         test_only=test_only,
         tools=go_tools,
+        needs_transitive_deps=_needs_transitive_deps,
     )
 
 
@@ -159,7 +161,7 @@ def cgo_library(name, srcs, env=None, deps=None, visibility=None, test_only=Fals
     env_cmd = ' '.join('export %s="%s";' % (k, v) for k, v in sorted(env.items()))
     cmd = ' && '.join([
         'if [ ! -d src ]; then ln -s . src; fi',
-        'go install ${PKG#*src/}',
+        'go install -gcflags "-trimpath $TMP_DIR" ${PKG#*src/}',
         'mv pkg/${OS}_${ARCH}/${PKG#*src/}.a $OUT',
     ])
 
@@ -225,7 +227,7 @@ def go_binary(name, main=None, srcs=None, deps=None, visibility=None, test_only=
 
 
 def go_test(name, srcs, data=None, deps=None, visibility=None, container=False,
-            timeout=0, flaky=0, test_outputs=None, labels=None, size=None):
+            timeout=0, flaky=0, test_outputs=None, labels=None, size=None, mocks=None):
     """Defines a Go test rule.
 
     Args:
@@ -240,6 +242,9 @@ def go_test(name, srcs, data=None, deps=None, visibility=None, container=False,
       test_outputs (list): Extra test output files to generate from this test.
       labels (list): Labels for this rule.
       size (str): Test size (enormous, large, medium or small).
+      mocks (dict): Dictionary of packages to mock, e.g. {"os": "//mocks:mock_os"}
+                    They are replaced at link time, so it's only possible to mock complete packages.
+                    Each build rule should be a go_library (or something equivalent).
     """
     deps = deps or []
     timeout, labels = _test_size_and_timeout(size, timeout, labels)
@@ -279,15 +284,25 @@ def go_test(name, srcs, data=None, deps=None, visibility=None, container=False,
         name='_%s#main_lib' % name,
         srcs=[':_%s#main' % name],
         deps=deps,
+        _needs_transitive_deps=True,  # Rather annoyingly this is only needed for coverage
         test_only=True,
     )
+    cmds = _GO_BINARY_CMDS
+    if mocks:
+        cmds = cmds.copy()
+        mocks = sorted(mocks.items())
+        deps.extend(v for _, v in mocks)
+        dirs = 'mkdir -p ' + ' '.join('$(dirname %s)' % k for k, _ in mocks)
+        mvs = ' && '.join('mv $(location %s) %s.a' % (v, k) for k, v in mocks)
+        for k, v in cmds.items():
+            cmds[k] = ' && '.join([dirs, mvs, v])
     build_rule(
         name=name,
         srcs=[':_%s#main_lib' % name],
         data=data,
         deps=deps,
         outs=[name],
-        cmd=_GO_BINARY_CMDS,
+        cmd=cmds,
         test_cmd='$(exe :%s) | tee test.results' % name,
         visibility=visibility,
         container=container,
@@ -387,9 +402,9 @@ def go_get(name, get=None, outs=None, deps=None, visibility=None, patch=None,
         cmd.append('(cd %s && git checkout -q %s)' % (subdir, revision))
     if patch:
         cmd.append('patch -s -d %s -p1 < ${TMP_DIR}/$(location %s)' % (subdir, patch))
-    cmd.append('go install ' + get)
+    cmd.append('go install -gcflags "-trimpath $TMP_DIR" ' + get)
     if install:
-        cmd.extend('go install %s' % lib for lib in install)
+        cmd.extend('go install -gcflags "-trimpath $TMP_DIR" %s' % lib for lib in install)
     if not binary:
         cmd.extend([
             'find . -name .git | xargs rm -rf',
@@ -407,6 +422,28 @@ def go_get(name, get=None, outs=None, deps=None, visibility=None, patch=None,
         requires=['go'],
         test_only=test_only,
         post_build=post_build,
+    )
+
+
+def go_yacc(name, src, out=None, visibility=None, labels=None):
+    """Defines a rule that invokes 'go tool yacc' to generate Go source using yacc.
+
+    Args:
+      name (str): Name of the rule.
+      src (str): Source file for the rule. There can be only one.
+      out (str): Output file for the rule. Defaults to name + '.yacc.go'.
+      visibility (list): Visibility specification.
+      labels (list): Labels for this rule.
+    """
+    build_rule(
+        name = name,
+        srcs = [src],
+        outs = [out or name + '.yacc.go'],
+        cmd = 'go tool yacc -o $OUT $SRC',
+        building_description = 'yaccing...',
+        visibility = visibility,
+        labels = labels,
+        requires = ['go'],
     )
 
 

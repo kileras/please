@@ -1,3 +1,73 @@
+Version 4.3.2
+-------------
+
+    * Fix a divide by zero bug in coverage stats display.
+
+
+Version 4.3.1
+-------------
+
+    * Fix to java configs from previous version where opt didn't have debug info,
+      we have an example of a test that fails in that configuration, so disabling
+      until we have more info.
+
+
+Version 4.3.0
+-------------
+
+    * Default compiler options for javac are now settable in config file.
+    * Fixes to rare, subtle & quick to anger panics from concurrent map accesses in
+      plz and the cache servers.
+    * Fix to C++ tests where very rarely the output file got overwritten.
+    * Work paths are correctly stripped from cgo_library and go_get rules.
+
+
+Version 4.2.2
+-------------
+
+    * Fix divide by zero in coverage stats.
+    * Another RPC cache fix, do not delete outputs when retrieving other files, only
+      when retrieving the main ones in the build step.
+
+
+Version 4.2.1
+-------------
+
+    * The RPC cache now deletes outputs of a target to fix a rare case around targets
+      that have an output that is a directory and items in it are later removed.
+
+
+Version 4.2.0
+-------------
+
+    * Adds some extra stats to output coverage file.
+
+Version 4.1.0
+-------------
+
+    * New command, `plz watch`, which watches the sources of a set of targets for
+      changes and rebuilds / re-tests them when they do.
+    * Support for generating C++ gRPC code in grpc_library.
+    * maven_jar now has a `binary` argument which prompts it to download a
+      native binary (.exe in Maven parlance).
+    * Some subtle changes to pexes to make them work better when not zip_safe.
+    * Bazel compatibility mode now supports $@, $<, etc.
+
+
+Version 4.0.2
+-------------
+
+    * Remove Docker containers more forcibly.
+    * Exit code of fatal build failures changed slightly.
+    * python_binary now correctly accepts a rule for its `main`.
+
+
+Version 4.0.1
+-------------
+
+    * Fixes some containerised Java tests when calculating coverage.
+
+
 Version 4.0.0
 -------------
 
@@ -19,6 +89,9 @@ Version 4.0.0
       change, hence the major version bump.
     * Config options can be dynamically overridden on the command line,
       e.g. `plz build -o go.version:1.7`
+    * Output files are made read-only in most cases.
+    * Post-build functions are run once only since it's quite tough to require them to be
+      idempotent.
 
 
 Version 3.6.2
