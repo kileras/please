@@ -18,22 +18,38 @@ maven_jar(
     hash = 'sha1: 8908f57125132a4468ea9977705a83f61b94fa89',
 )
 
-maven_jars(
-    name = 'jacoco',
-    id = 'org.jacoco:jacoco:0.7.6.201602180812',
-    exclude = [
-        'org.jacoco.ant',
-        'org.jacoco.doc',
-        'org.jacoco.examples',
-        'asm-debug-all',
+maven_jar(
+    name = 'org.jacoco.core',
+    id = 'org.jacoco:org.jacoco.core:0.7.6.201602180812',
+    hash = 'ecd020a32fdfc96c6c845422978b362e11bdde5d',
+    deps = [
+        ':asm',
     ],
-    hashes = {
-        'org.jacoco.report': 'sha1: fe79a683193a3e897e734add5abae9af27eedf13',
-        'org.jacoco.agent': 'sha1: 536da5bb74368a21bf322dff9413c23c7b595b61',
-        'org.jacoco.core': 'sha1: ecd020a32fdfc96c6c845422978b362e11bdde5d',
-    },
-    deps = [':asm'],
-    deps_only = True,
+)
+
+maven_jar(
+    name = 'org.jacoco.report',
+    id = 'org.jacoco:org.jacoco.report:0.7.6.201602180812',
+    hash = 'fe79a683193a3e897e734add5abae9af27eedf13',
+    deps = [
+        ':org.jacoco.core',
+        ':asm',
+    ],
+)
+
+maven_jar(
+    name = 'org.jacoco.agent',
+    id = 'org.jacoco:org.jacoco.agent:0.7.6.201602180812',
+    hash = '536da5bb74368a21bf322dff9413c23c7b595b61',
+)
+
+java_library(
+    name = 'jacoco',
+    exported_deps = [
+        ':org.jacoco.core',
+        ':org.jacoco.report',
+        ':org.jacoco.agent',
+    ],
 )
 
 maven_jar(
