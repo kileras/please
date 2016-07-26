@@ -74,15 +74,13 @@ def cc_library(name, srcs=None, hdrs=None, private_hdrs=None, deps=None, visibil
     }
     a_rules = []
     for src in srcs:
-        if len(srcs) > 1:
-            a_name = '_%s#%s' % (name, src.replace('/', '_').replace('.', '_').replace(':', '_'))
-        else:
-            a_name = '_%s#a' % name
+        a_name = '_%s#%s' % (name, src.replace('/', '_').replace('.', '_').replace(':', '_'))
         build_rule(
             name=a_name,
             srcs={'srcs': [src], 'hdrs': hdrs, 'priv': private_hdrs},
             outs=[a_name + '.a'],
             deps=deps,
+            visibility=visibility,
             cmd=cmds,
             building_description='Compiling...',
             requires=['cc', 'cc_hdrs'],
