@@ -130,10 +130,16 @@ maven_jar(
     deps = [
         ':maven-model',
         ':maven-model-builder',
+        ':maven-repository-metadata',
         ':plexus-interpolation',
         ':plexus-utils',
         ':apache-httpclient',
     ],
+)
+maven_jar(
+    name = 'maven-repository-metadata',
+    id = 'org.apache.maven:maven-repository-metadata:3.1.0',
+    hash = 'b9a5f0bbabdf4b2c476b08cd0440cf99a8b863d0',
 )
 maven_jar(
     name = 'maven-model',
