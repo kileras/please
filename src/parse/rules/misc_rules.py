@@ -110,9 +110,10 @@ def gentest(name, test_cmd, labels=None, cmd=None, srcs=None, outs=None, deps=No
 
     Args:
       name (str): Name of the rule
-      test_cmd (str): Command to run for the test.
+      test_cmd (str | dict): Command to run for the test. It works similarly to the cmd attribute;
+                             see genrule for a more detailed discussion of its properties.
       labels (list): Labels to apply to this test.
-      cmd (str): Command to run to build the test.
+      cmd (str | dict): Command to run to build the test.
       srcs (list): Source files for this rule.
       outs (list): Output files of this rule.
       deps (list): Dependencies of this rule.
@@ -215,6 +216,43 @@ def filegroup(name, srcs=None, deps=None, exported_deps=None, visibility=None, l
         test_only=test_only,
         labels=labels,
         binary=binary,
+    )
+
+
+def hash_filegroup(name, srcs=None, deps=None, exported_deps=None, visibility=None,
+                   labels=None, test_only=False, requires=None):
+    """Copies a set of files to output names which are uniquely hashed based on their contents.
+
+    For example, srcs = ["test.txt"] might output "test-b250cnf30f3h.txt".
+
+    Args:
+      name (str): Name of the rule.
+      srcs (list): Source files for the rule.
+      deps (list): Dependencies of the rule.
+      exported_deps (list): Dependencies that will become visible to any rules that depend on this rule.
+      visibility (list): Visibility declaration
+      labels (list): Labels to apply to this rule
+      test_only (bool): If true the exported file can only be used by test targets.
+      requires (list): Kinds of output from other rules that this one requires.
+    """
+    build_rule(
+        name=name,
+        srcs=srcs,
+        deps=deps,
+        cmd = '; '.join('for FILE in $(locations %s); do BN=$(basename $FILE); '
+                        'BASE="${BN%%.*}"; EXT="${BN:${#BASE} + 1}"; '
+                        'OUT="${BASE}-$(hash %s)"; '
+                        '[ -n "$EXT" ] && OUT="${OUT}.${EXT}"; '
+                        'mv $FILE $OUT; echo $OUT; done' % (src, src) for src in srcs),
+        exported_deps=exported_deps,
+        visibility=visibility,
+        building_description='Copying...',
+        output_is_complete=True,
+        test_only=test_only,
+        labels=labels,
+        requires=requires,
+        post_build=lambda name, output: [add_out(name, out) for out in output],
+        stamp=True,
     )
 
 

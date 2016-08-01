@@ -168,6 +168,14 @@ func pathHash(path string, recalc bool) ([]byte, error) {
 	return result, err
 }
 
+func mustPathHash(path string) []byte {
+	hash, err := pathHash(path, false)
+	if err != nil {
+		panic(err)
+	}
+	return hash
+}
+
 func pathHashImpl(path string) ([]byte, error) {
 	h := sha1.New()
 	info, err := os.Lstat(path)
@@ -287,7 +295,8 @@ func ruleHash(target *core.BuildTarget, runtime bool) []byte {
 	h.Write([]byte(target.GetCommand()))
 
 	if runtime {
-		h.Write([]byte(target.TestCommand))
+		// Similarly, we only hash the current command here again.
+		h.Write([]byte(target.GetTestCommand()))
 		for _, datum := range target.Data {
 			h.Write([]byte(datum.String()))
 		}

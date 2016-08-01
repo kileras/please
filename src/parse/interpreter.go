@@ -1,7 +1,7 @@
 // Rule parser using PyPy. To build this you need PyPy installed, but the stock one
 // that comes with Ubuntu will not work since it doesn't include shared libraries.
-// We have a deb at https://s3-eu-west-1.amazonaws.com/please-build/pypy_4.0.0_amd64.deb
-// which contains essentially the contents of a recent PyPy tarball.
+// For now we suggest fetching the upstream packages from pypy.org. Other distros
+// might work fine though.
 // On OSX installing through Homebrew should be fine.
 //
 // The interface to PyPy is done through cgo and cffi. This means that we need to write very little
@@ -468,8 +468,13 @@ func AddNamedSource(cTarget uintptr, cName *C.char, cSource *C.char) *C.char {
 
 //export AddCommand
 func AddCommand(cTarget uintptr, cConfig *C.char, cCommand *C.char) *C.char {
-	target := unsizet(cTarget)
-	target.AddCommand(C.GoString(cConfig), C.GoString(cCommand))
+	unsizet(cTarget).AddCommand(C.GoString(cConfig), C.GoString(cCommand))
+	return nil
+}
+
+//export AddTestCommand
+func AddTestCommand(cTarget uintptr, cConfig *C.char, cCommand *C.char) *C.char {
+	unsizet(cTarget).AddTestCommand(C.GoString(cConfig), C.GoString(cCommand))
 	return nil
 }
 
