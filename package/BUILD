@@ -50,15 +50,24 @@ genrule(
     cmd = 'cp $SRC $OUT',
 )
 
+# And .jar from this guy
+genrule(
+    name = 'please_maven',
+    srcs = ['//src/build/java_please_maven'],
+    outs = ['please_maven'],
+    binary = True,
+    cmd = 'cp $SRC $OUT',
+)
+
 tarball(
     name = 'please_tarball',
     srcs = [
+        ':please_maven',
         ':please_pex',
         '//src:please',
         '//src/build/go:please_go_test',
         '//src/build/java:jarcat',
         '//src/build/java:junit_runner',
-        '//src/build/java:please_maven',
         '//src/cache/main:cache_cleaner',
         '//src/misc:plz_diff_graphs',
         '//src/parse/cffi:all_engines',

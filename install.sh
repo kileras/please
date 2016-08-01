@@ -26,7 +26,7 @@ else
     chmod 0664 /opt/please/junit_runner.jar
     cp plz-out/bin/src/build/java/jarcat /opt/please/jarcat
     chmod 0775 /opt/please/jarcat
-    cp plz-out/bin/src/build/java/please_maven /opt/please/please_maven
+    cp plz-out/bin/src/build/java/please_maven.jar /opt/please/please_maven
     chmod 0775 /opt/please/please_maven
     cp plz-out/bin/src/cache/main/cache_cleaner /opt/please/cache_cleaner
     chmod 0775 /opt/please/cache_cleaner
