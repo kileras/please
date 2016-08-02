@@ -27,12 +27,11 @@ public class PleaseMaven {
   @Option(name = "-e", usage = "Artifacts to exclude")
   private List<String> excludeArtifact = new ArrayList<>();
 
+  @Option(name = "-o", usage = "Optional dependencies to fetch")
+  private List<String> optionalDeps = new ArrayList<>();
+
   @Argument(usage = "<artifact id>")
   private List<String> artifactNames = new ArrayList<>();
-
-  public static void main(String[] args) throws Exception {
-    new PleaseMaven().run(args);
-  }
 
   public void run(String[] args) throws Exception {
     CmdLineParser parser = new CmdLineParser(this);
@@ -48,12 +47,16 @@ public class PleaseMaven {
       System.exit(1);
     }
 
-    Maven maven = new Maven(repository);
+    Maven maven = new Maven(repository, optionalDeps);
     for (String artifactName : artifactNames) {
       Set<Artifact> artifacts = maven.transitiveDependencies(new DefaultArtifact(artifactName));
       for (Artifact artifact : artifacts) {
         System.out.printf("%s:%s:%s\n", artifact.getGroupId(), artifact.getArtifactId(), artifact.getVersion());
       }
     }
+  }
+
+  public static void main(String[] args) throws Exception {
+    new PleaseMaven().run(args);
   }
 }

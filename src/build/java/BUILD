@@ -39,6 +39,7 @@ go_binary(
 
 go_binary(
     name = 'please_maven_old',
+    main = 'please_maven.go',
     visibility = ['PUBLIC'],
     deps = [
         '//src/output',

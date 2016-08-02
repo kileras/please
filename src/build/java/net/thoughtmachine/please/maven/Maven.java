@@ -32,13 +32,14 @@ import org.eclipse.aether.util.graph.visitor.PreorderNodeListGenerator;
 public class Maven {
 
   private final String repository;
+  private final List<String> optionalDeps;
 
-  public Maven(String repository) {
+  public Maven(String repository, List<String> optionalDeps) {
     this.repository = repository;
+    this.optionalDeps = optionalDeps;
   }
 
-  public
-  Set<Artifact> transitiveDependencies(Artifact artifact) {
+  public Set<Artifact> transitiveDependencies(Artifact artifact) {
 
     RepositorySystem system = newRepositorySystem();
 
@@ -60,8 +61,7 @@ public class Maven {
 
     Set<Artifact> artifacts = new LinkedHashSet<>();
     for (DependencyNode node : visitor.getNodes()) {
-      // TODO(pebers): Optional dependencies will be needed at some point.
-      if (!node.getDependency().isOptional()) {
+      if (!node.getDependency().isOptional() || optionalDeps.contains(node.getArtifact().getArtifactId())) {
         artifacts.add(node.getArtifact());
       }
     }
