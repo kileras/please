@@ -19,6 +19,7 @@ go_library(
     ) + [':version'],
     visibility = ['PUBLIC'],
     deps = [
+        '//third_party/go:concurrent-map',
         '//third_party/go:gcfg',
         '//third_party/go:logging',
         '//third_party/go:queue',

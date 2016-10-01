@@ -4,14 +4,18 @@
 
 package core
 
-import "sort"
-import "sync"
+import (
+	"sort"
+	"sync"
+
+	"github.com/streamrail/concurrent-map"
+)
 
 type BuildGraph struct {
 	// Map of all currently known targets by their label.
-	targets map[BuildLabel]*BuildTarget
+	targets cmap.ConcurrentMap
 	// Map of all currently known packages.
-	packages map[string]*Package
+	packages cmap.ConcurrentMap
 	// Reverse dependencies that are pending on targets actually being added to the graph.
 	pendingRevDeps map[BuildLabel]map[BuildLabel]*BuildTarget
 	// Actual reverse dependencies
@@ -23,21 +27,19 @@ type BuildGraph struct {
 
 // Adds a new target to the graph.
 func (graph *BuildGraph) AddTarget(target *BuildTarget) *BuildTarget {
-	graph.mutex.Lock()
-	defer graph.mutex.Unlock()
-	_, present := graph.targets[target.Label]
-	if present {
+	if !graph.targets.SetIfAbsent(target.Label.String(), target) {
 		panic("Attempted to re-add existing target to build graph: " + target.Label.String())
 	}
-	graph.targets[target.Label] = target
 	// Check these reverse deps which may have already been added against this target.
+	graph.mutex.Lock()
+	defer graph.mutex.Unlock()
 	revdeps, present := graph.pendingRevDeps[target.Label]
 	if present {
 		for revdep, originalTarget := range revdeps {
 			if originalTarget != nil {
-				graph.linkDependencies(graph.targets[revdep], originalTarget)
+				graph.linkDependencies(graph.Target(revdep), originalTarget)
 			} else {
-				graph.linkDependencies(graph.targets[revdep], target)
+				graph.linkDependencies(graph.Target(revdep), target)
 			}
 		}
 		delete(graph.pendingRevDeps, target.Label) // Don't need any more
@@ -47,19 +49,18 @@ func (graph *BuildGraph) AddTarget(target *BuildTarget) *BuildTarget {
 
 // Adds a new package to the graph with given name.
 func (graph *BuildGraph) AddPackage(pkg *Package) {
-	graph.mutex.Lock()
-	defer graph.mutex.Unlock()
-	if _, present := graph.packages[pkg.Name]; present {
+	if !graph.packages.SetIfAbsent(pkg.Name, pkg) {
 		panic("Attempt to readd existing package: " + pkg.Name)
 	}
-	graph.packages[pkg.Name] = pkg
 }
 
 // Target retrieves a target from the graph by label
 func (graph *BuildGraph) Target(label BuildLabel) *BuildTarget {
-	graph.mutex.RLock()
-	defer graph.mutex.RUnlock()
-	return graph.targets[label]
+	target, present := graph.targets.Get(label.String())
+	if !present {
+		return nil
+	}
+	return target.(*BuildTarget)
 }
 
 // TargetOrDie retrieves a target from the graph by label. Dies if the target doesn't exist.
@@ -73,9 +74,11 @@ func (graph *BuildGraph) TargetOrDie(label BuildLabel) *BuildTarget {
 
 // Package retrieves a package from the graph by name
 func (graph *BuildGraph) Package(name string) *Package {
-	graph.mutex.RLock()
-	defer graph.mutex.RUnlock()
-	return graph.packages[name]
+	pkg, present := graph.packages.Get(name)
+	if !present {
+		return nil
+	}
+	return pkg.(*Package)
 }
 
 // PackageOrDie retrieves a package by name, and dies if it can't be found.
@@ -88,18 +91,14 @@ func (graph *BuildGraph) PackageOrDie(name string) *Package {
 }
 
 func (graph *BuildGraph) Len() int {
-	graph.mutex.RLock()
-	defer graph.mutex.RUnlock()
-	return len(graph.targets)
+	return graph.targets.Count()
 }
 
 // Returns a sorted slice of all the targets in the graph.
 func (graph *BuildGraph) AllTargets() BuildTargets {
-	graph.mutex.RLock()
-	defer graph.mutex.RUnlock()
-	targets := make(BuildTargets, 0, len(graph.targets))
-	for _, target := range graph.targets {
-		targets = append(targets, target)
+	targets := make(BuildTargets, 0, graph.Len())
+	for kv := range graph.targets.IterBuffered() {
+		targets = append(targets, kv.Val.(*BuildTarget))
 	}
 	sort.Sort(targets)
 	return targets
@@ -107,11 +106,9 @@ func (graph *BuildGraph) AllTargets() BuildTargets {
 
 // Used for getting a local copy of the package map without having to expose it publicly.
 func (graph *BuildGraph) PackageMap() map[string]*Package {
-	graph.mutex.RLock()
-	defer graph.mutex.RUnlock()
 	packages := make(map[string]*Package)
-	for name, pkg := range graph.packages {
-		packages[name] = pkg
+	for kv := range graph.packages.IterBuffered() {
+		packages[kv.Key] = kv.Val.(*Package)
 	}
 	return packages
 }
@@ -119,15 +116,14 @@ func (graph *BuildGraph) PackageMap() map[string]*Package {
 func (graph *BuildGraph) AddDependency(from BuildLabel, to BuildLabel) {
 	graph.mutex.Lock()
 	defer graph.mutex.Unlock()
-	fromTarget := graph.targets[from]
+	fromTarget := graph.Target(from)
 	// We might have done this already; do a quick check here first.
 	if fromTarget.hasResolvedDependency(to) {
 		return
 	}
-	toTarget, present := graph.targets[to]
 	// The dependency may not exist yet if we haven't parsed its package.
 	// In that case we stash it away for later.
-	if !present {
+	if toTarget := graph.Target(to); toTarget == nil {
 		graph.addPendingRevDep(from, to, nil)
 	} else {
 		graph.linkDependencies(fromTarget, toTarget)
@@ -135,12 +131,12 @@ func (graph *BuildGraph) AddDependency(from BuildLabel, to BuildLabel) {
 }
 
 func NewGraph() *BuildGraph {
-	graph := new(BuildGraph)
-	graph.targets = make(map[BuildLabel]*BuildTarget)
-	graph.packages = make(map[string]*Package)
-	graph.pendingRevDeps = make(map[BuildLabel]map[BuildLabel]*BuildTarget)
-	graph.revDeps = make(map[BuildLabel][]*BuildTarget)
-	return graph
+	return &BuildGraph{
+		targets:        cmap.New(),
+		packages:       cmap.New(),
+		pendingRevDeps: map[BuildLabel]map[BuildLabel]*BuildTarget{},
+		revDeps:        map[BuildLabel][]*BuildTarget{},
+	}
 }
 
 // ReverseDependencies returns the set of revdeps on the given target.
@@ -174,8 +170,7 @@ func (graph *BuildGraph) AllDependenciesResolved(target *BuildTarget) bool {
 // point, but some of the dependencies may not yet exist.
 func (graph *BuildGraph) linkDependencies(fromTarget, toTarget *BuildTarget) {
 	for _, label := range toTarget.ProvideFor(fromTarget) {
-		target, present := graph.targets[label]
-		if present {
+		if target := graph.Target(label); target != nil {
 			fromTarget.resolveDependency(toTarget.Label, target)
 			graph.revDeps[label] = append(graph.revDeps[label], fromTarget)
 		} else {
