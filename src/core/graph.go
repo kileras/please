@@ -17,13 +17,15 @@ type BuildGraph struct {
 	// Map of all currently known packages.
 	packages cmap.ConcurrentMap
 	// Reverse dependencies that are pending on targets actually being added to the graph.
-	pendingRevDeps map[BuildLabel]map[BuildLabel]*BuildTarget
+	pendingRevDeps cmap.ConcurrentMap
 	// Actual reverse dependencies
-	revDeps map[BuildLabel][]*BuildTarget
+	revDeps cmap.ConcurrentMap
 	// Used to arbitrate access to the graph. We parallelise most build operations
 	// and Go maps aren't natively threadsafe so this is needed.
 	mutex sync.RWMutex
 }
+
+type revdepMap map[BuildLabel]*BuildTarget
 
 // Adds a new target to the graph.
 func (graph *BuildGraph) AddTarget(target *BuildTarget) *BuildTarget {
@@ -31,18 +33,15 @@ func (graph *BuildGraph) AddTarget(target *BuildTarget) *BuildTarget {
 		panic("Attempted to re-add existing target to build graph: " + target.Label.String())
 	}
 	// Check these reverse deps which may have already been added against this target.
-	graph.mutex.Lock()
-	defer graph.mutex.Unlock()
-	revdeps, present := graph.pendingRevDeps[target.Label]
-	if present {
-		for revdep, originalTarget := range revdeps {
+	if revdeps, present := graph.pendingRevDeps.Get(target.Label.String()); present {
+		for revdep, originalTarget := range revdeps.(revdepMap) {
 			if originalTarget != nil {
 				graph.linkDependencies(graph.Target(revdep), originalTarget)
 			} else {
 				graph.linkDependencies(graph.Target(revdep), target)
 			}
 		}
-		delete(graph.pendingRevDeps, target.Label) // Don't need any more
+		graph.pendingRevDeps.Remove(target.Label.String())
 	}
 	return target
 }
@@ -114,8 +113,6 @@ func (graph *BuildGraph) PackageMap() map[string]*Package {
 }
 
 func (graph *BuildGraph) AddDependency(from BuildLabel, to BuildLabel) {
-	graph.mutex.Lock()
-	defer graph.mutex.Unlock()
 	fromTarget := graph.Target(from)
 	// We might have done this already; do a quick check here first.
 	if fromTarget.hasResolvedDependency(to) {
@@ -134,19 +131,17 @@ func NewGraph() *BuildGraph {
 	return &BuildGraph{
 		targets:        cmap.New(),
 		packages:       cmap.New(),
-		pendingRevDeps: map[BuildLabel]map[BuildLabel]*BuildTarget{},
-		revDeps:        map[BuildLabel][]*BuildTarget{},
+		pendingRevDeps: cmap.New(),
+		revDeps:        cmap.New(),
 	}
 }
 
 // ReverseDependencies returns the set of revdeps on the given target.
 func (graph *BuildGraph) ReverseDependencies(target *BuildTarget) []*BuildTarget {
-	graph.mutex.RLock()
-	defer graph.mutex.RUnlock()
-	if revdeps, present := graph.revDeps[target.Label]; present {
-		return revdeps[:]
+	if revdeps, present := graph.revDeps.Get(target.Label.String()); present {
+		return revdeps.(BuildTargets)[:]
 	}
-	return []*BuildTarget{}
+	return nil
 }
 
 // AllDepsBuilt returns true if all the dependencies of a target are built.
@@ -172,7 +167,11 @@ func (graph *BuildGraph) linkDependencies(fromTarget, toTarget *BuildTarget) {
 	for _, label := range toTarget.ProvideFor(fromTarget) {
 		if target := graph.Target(label); target != nil {
 			fromTarget.resolveDependency(toTarget.Label, target)
-			graph.revDeps[label] = append(graph.revDeps[label], fromTarget)
+			if revdeps, present := graph.revDeps.Get(label.String()); present {
+				graph.revDeps.Set(label.String(), append(revdeps.(BuildTargets), fromTarget))
+			} else {
+				graph.revDeps.Set(label.String(), BuildTargets{fromTarget})
+			}
 		} else {
 			graph.addPendingRevDep(fromTarget.Label, label, toTarget)
 		}
@@ -180,10 +179,12 @@ func (graph *BuildGraph) linkDependencies(fromTarget, toTarget *BuildTarget) {
 }
 
 func (graph *BuildGraph) addPendingRevDep(from, to BuildLabel, orig *BuildTarget) {
-	if deps, present := graph.pendingRevDeps[to]; present {
-		deps[from] = orig
+	graph.mutex.Lock()
+	defer graph.mutex.Unlock()
+	if deps, present := graph.pendingRevDeps.Get(to.String()); present {
+		deps.(revdepMap)[from] = orig
 	} else {
-		graph.pendingRevDeps[to] = map[BuildLabel]*BuildTarget{from: orig}
+		graph.pendingRevDeps.Set(to.String(), revdepMap{from: orig})
 	}
 }
 
