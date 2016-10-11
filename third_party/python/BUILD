@@ -13,8 +13,8 @@ pip_library(
 pip_library(
     name = 'xmlrunner',
     package_name = 'unittest-xml-reporting',
-    version = '1.11.0',
-    hashes = ['sha1: 62e71134eb068413e40fe4d973451c0e4931db5a'],
+    version = '2.1.0',
+    hashes = ['sha1: a22aaf51911c21b8a1162307eee172422f6f0f8f'],
     deps = [':six'],
 )
 
