@@ -14,10 +14,10 @@ maven_jar(
 
 maven_jars(
     name = 'guava',
-    id = 'com.google.guava:guava:18.0',
+    id = 'com.google.guava:guava:19.0',
     exclude = ['jsr305'],
     hashes = {
-        'guava': 'sha1: 8908f57125132a4468ea9977705a83f61b94fa89',
+        'guava': 'sha1: d971ce6b87a6dc5b122b8557da5659c544028853',
     },
 )
 
@@ -69,7 +69,7 @@ maven_jar(
 
 maven_jar(
     name = 'protobuf',
-    id = 'com.google.protobuf:protobuf-java:3.0.0-beta-3',
-    hash = 'ed118aa0276005ca49b18a3a2b77eaacdec95680',
+    id = 'com.google.protobuf:protobuf-java:3.0.0',
+    hash = '88d92d14d257f10971fbb734ffcdd290817045c0',
     sources = False,
 )
