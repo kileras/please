@@ -5,6 +5,7 @@ python_binary(
     shebang = '/usr/bin/env python',
     deps = [
         ':main_files',
+        '//src/build/proto:worker',
         '//third_party/python:pex',
         '//third_party/python:pkg_resources',
     ],
@@ -49,7 +50,7 @@ build_rule(
     binary = True,
     cmd = ' && '.join([
         # Have to make sure these exist.
-        'touch third_party/__init__.py third_party/python/__init__.py',
+        'touch third_party/__init__.py third_party/python/__init__.py src/build/proto/__init__.py',
         'touch src/__init__.py src/build/__init__.py src/build/python/__init__.py',
         'PYTHONPATH="." python -O src/build/python/pex.py --src_dir=${TMP_DIR} --out=${OUT} --entry_point=${PKG//\//.}.pex --interpreter ' + CONFIG.DEFAULT_PYTHON_INTERPRETER,
     ]),
@@ -63,6 +64,7 @@ build_rule(
         '//third_party/python:_six#install',
         '//third_party/python:_xmlrunner#install',
         '//third_party/python:_coverage#install',
+        '//src/build/proto:_worker#protoc_py',
     ],
     visibility = ['PUBLIC'],
 )

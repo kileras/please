@@ -54,7 +54,8 @@ def python_library(name, srcs=None, resources=None, deps=None, visibility=None,
             name='_%s#zip' % name,
             srcs=all_srcs,
             outs=['.%s.pex.zip' % name],
-            cmd='%s %s --compile && %s -d -o ${OUTS} -i .' % (interpreter_tool, pex_tool, jarcat_tool),
+            cmd='$(worker %s %s) --compile --src_dir=$TMP_DIR && %s -d -o ${OUTS} -i .' %
+                (interpreter_tool, pex_tool, jarcat_tool),
             building_description='Compressing...',
             requires=['py'],
             test_only=test_only,
@@ -107,12 +108,11 @@ def python_binary(name, main, resources=None, out=None, deps=None, visibility=No
     jarcat_tool, tools = _tool_path(CONFIG.JARCAT_TOOL, tools)
     deps = deps or []
     cmd = ' '.join([
-        'rm -f $SRCS &&',
-        interpreter_tool,
-        pex_tool,
+        '$(worker %s %s)' % (interpreter_tool, pex_tool),
         '--src_dir=${TMP_DIR}',
         '--out=temp.pex',
         '--entry_point=$SRCS',
+        '--rm=$SRCS',
         '--noscan',
         '--shebang="%s"' % shebang if shebang else '',
         '--interpreter=' + interpreter_tool,
@@ -205,9 +205,7 @@ def python_test(name, srcs, data=None, resources=None, deps=None, labels=None, s
     interpreter_tool, tools = _tool_path(interpreter or CONFIG.DEFAULT_PYTHON_INTERPRETER)
     pex_tool, tools = _tool_path(CONFIG.PEX_TOOL, tools)
     jarcat_tool, tools = _tool_path(CONFIG.JARCAT_TOOL, tools)
-    cmd=' '.join([
-        interpreter_tool,
-        pex_tool,
+    cmd=' '.join(['$(worker %s %s)' % (interpreter_tool, pex_tool),
         '--src_dir=${TMP_DIR}',
         '--out=temp.pex',
         '--entry_point=test_main',

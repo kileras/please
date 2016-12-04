@@ -91,7 +91,11 @@ func getOrStartWorker(worker string) (*workerServer, error) {
 		return w, nil
 	}
 	// Need to create a new process
-	cmd := exec.Command(worker)
+	cmds, err := shlex.Split(worker)
+	if err != nil {
+		return nil, err
+	}
+	cmd := exec.Command(cmds[0], cmds[1:]...)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, err

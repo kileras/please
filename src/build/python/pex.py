@@ -8,6 +8,7 @@ import os
 import pkg_resources
 import py_compile
 import shutil
+import struct
 import sys
 import tempfile
 import zipfile
@@ -15,6 +16,8 @@ import zipfile
 from third_party.python.pex.compatibility import to_bytes
 from third_party.python.pex.pex_builder import PEXBuilder
 from third_party.python.pex.interpreter import PythonInterpreter
+
+from src.build.proto import worker_pb2
 
 
 def dereference_symlinks(src):
@@ -105,9 +108,9 @@ def extract_file(in_pkg, out_dir, filename, duplicates_allowed=False):
         write_file(f, pkg_resources.resource_string(in_pkg, filename))
 
 
-def compile_bytecode():
+def compile_bytecode(directory):
     """Walks the temp dir and precompiles bytecode for all .py files there."""
-    for dirpath, dirnames, filenames in os.walk('.'):
+    for dirpath, dirnames, filenames in os.walk(directory):
         paths = [os.path.join(dirpath, filename) for filename in filenames]
         # Must remove any .pyc files first in case they turn out to be present but readonly.
         # This seems to happen on some rare cases, we're not 100% sure why yet.
@@ -134,8 +137,12 @@ def compile_bytecode():
 def main(args):
     # If --compile is given, we just need to precompile bytecode.
     if args.compile:
-        compile_bytecode()
-        sys.exit(0)
+        compile_bytecode(args.src_dir)
+        return
+
+    # Optional argument to remove files before beginning.
+    if args.rm:
+        os.remote(args.rm)
 
     # Pex doesn't support relative interpreter paths.
     if not args.interpreter.startswith('/'):
@@ -215,6 +222,29 @@ def main(args):
         shutil.rmtree(tmp_dir, True)
 
 
+def run_as_worker(parser):
+    """Enters a loop to run as a worker process."""
+    while True:
+        # N.B. If we wanted to support Windows we'd have to worry about binary vs. text
+        #      mode here, which is awkward for stdin which is already open.
+        # Size of forthcoming message
+        size = struct.unpack('<I', sys.stdin.read(4))[0]
+        request = worker_pb2.BuildRequest()
+        request.ParseFromString(sys.stdin.read(size))
+        args = parser.parse_args(request.opts)
+        args.src_dir = request.temp_dir
+        response = worker_pb2.BuildResponse()
+        try:
+            main(args)
+            response.success = True
+        except Exception as err:
+            response.success = False
+            response.messages = str(err)
+        data = response.SerializeToString()
+        sys.stdout.write(struct.pack('<I', len(data)))
+        sys.stdout.write(data)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--src_dir')
@@ -223,6 +253,7 @@ if __name__ == '__main__':
     parser.add_argument('--interpreter', default=sys.executable)
     parser.add_argument('--test_package')
     parser.add_argument('--test_srcs')
+    parser.add_argument('--rm')
     parser.add_argument('--shebang')
     parser.add_argument('--module_dir', default='')
     parser.add_argument('--zip_safe', dest='zip_safe', action='store_true')
@@ -231,4 +262,8 @@ if __name__ == '__main__':
     parser.add_argument('--noscan', dest='scan', action='store_false')
     parser.add_argument('--compile', dest='compile', action='store_true')
     parser.set_defaults(zip_safe=True, compile=False, scan=True)
-    main(parser.parse_args())
+
+    if len(sys.argv) == 1:
+        run_as_worker(parser)
+    else:
+        main(parser.parse_args())

@@ -7,6 +7,7 @@ proto_library(
     languages = [
         'go',
         'java',
+        'py',
     ],
     visibility = ['//src/build/...'],
 )
