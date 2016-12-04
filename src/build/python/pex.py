@@ -162,7 +162,7 @@ def main(args):
 
     # Setup a temp dir that the PEX builder will use as its scratch dir.
     tmp_dir = tempfile.mkdtemp()
-    tmp_file = '_temp.pex'
+    tmp_file = os.path.join(args.src_dir, '_temp.pex')
     try:
         if os.path.islink(args.interpreter) and os.readlink(args.interpreter) == 'python-exec2c':
             # Some distros have this intermediate binary; it messes things up for
@@ -201,7 +201,7 @@ def main(args):
         else:
             # Just add bootstrap dir and main.
             add_directory(args.src_dir, '.bootstrap', pex_builder)
-            pex_builder.add_source(pex_main + '.py', pex_main + '.py')
+            pex_builder.add_source(os.path.join(args.src_dir, pex_main + '.py'), pex_main + '.py')
 
         # This function does some setuptools malarkey which is vexing me, so
         # I'm just gonna cheekily disable it for now.
@@ -213,6 +213,8 @@ def main(args):
         pex_builder._prepare_inits = lambda: None
 
         # Generate the PEX file.
+        if not args.out.startswith('/'):
+            args.out = os.path.join(args.src_dir, args.out)
         pex_builder.build(args.out)
 
     # Always try cleaning up the scratch dir, ignoring failures.
@@ -234,13 +236,13 @@ def run_as_worker(parser):
         size = struct.unpack('<I', sys.stdin.read(4))[0]
         request = worker_pb2.BuildRequest()
         request.ParseFromString(sys.stdin.read(size))
-        args = parser.parse_args(request.opts)
-        args.src_dir = request.temp_dir
         response = worker_pb2.BuildResponse(rule=request.rule)
         try:
+            args = parser.parse_args(request.opts)
+            args.src_dir = request.temp_dir
             main(args)
             response.success = True
-        except Exception as err:
+        except (Exception, SystemExit) as err:
             response.success = False
             response.messages.append(str(err))
         data = response.SerializeToString()

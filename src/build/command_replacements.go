@@ -106,7 +106,7 @@ func workerCommandAndArgs(target *core.BuildTarget) (string, string, string, str
 		match[2] = replaceSequence(target, match[2], true, false, false, false, false, false)
 	}
 	return match[2],
-		replaceSequencesInternal(target, strings.TrimSpace(match[3]), false),
+		replaceSequencesInternal(target, core.ExpandHomePath(strings.TrimSpace(match[3])), false),
 		replaceSequencesInternal(target, strings.TrimSpace(match[4]), false),
 		replaceSequencesInternal(target, match[5], false)
 }

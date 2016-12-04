@@ -206,11 +206,11 @@ def python_test(name, srcs, data=None, resources=None, deps=None, labels=None, s
     pex_tool, tools = _tool_path(CONFIG.PEX_TOOL, tools)
     jarcat_tool, tools = _tool_path(CONFIG.JARCAT_TOOL, tools)
     cmd=' '.join(['$(worker %s %s)' % (interpreter_tool, pex_tool),
-        '--src_dir=${TMP_DIR}',
+        '--src_dir=$TMP_DIR',
         '--out=temp.pex',
         '--entry_point=test_main',
         '--test_package=${PKG//\//.}',
-        '--test_srcs=${SRCS_SRCS// /,}',
+#        '--test_srcs=${SRCS_SRCS// /,}',
         '--interpreter=' + interpreter_tool,
         '--module_dir=' + CONFIG.PYTHON_MODULE_DIR,
         '--zip_safe',
