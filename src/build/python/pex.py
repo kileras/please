@@ -17,8 +17,6 @@ from third_party.python.pex.compatibility import to_bytes
 from third_party.python.pex.pex_builder import PEXBuilder
 from third_party.python.pex.interpreter import PythonInterpreter
 
-from src.build.proto import worker_pb2
-
 
 def dereference_symlinks(src):
     """
@@ -142,7 +140,7 @@ def main(args):
 
     # Optional argument to remove files before beginning.
     if args.rm:
-        os.remote(args.rm)
+        os.remove(os.path.join(args.src_dir, args.rm))
 
     # Pex doesn't support relative interpreter paths.
     if not args.interpreter.startswith('/'):
@@ -224,6 +222,11 @@ def main(args):
 
 def run_as_worker(parser):
     """Enters a loop to run as a worker process."""
+    # Set our module dir appropriately
+    from src.build.python import pex_main
+    pex_main.override_import('third_party.python')
+    # Defer the import of this since it drags in a bunch of dependencies.
+    from src.build.proto import worker_pb2
     while True:
         # N.B. If we wanted to support Windows we'd have to worry about binary vs. text
         #      mode here, which is awkward for stdin which is already open.
@@ -233,16 +236,17 @@ def run_as_worker(parser):
         request.ParseFromString(sys.stdin.read(size))
         args = parser.parse_args(request.opts)
         args.src_dir = request.temp_dir
-        response = worker_pb2.BuildResponse()
+        response = worker_pb2.BuildResponse(rule=request.rule)
         try:
             main(args)
             response.success = True
         except Exception as err:
             response.success = False
-            response.messages = str(err)
+            response.messages.append(str(err))
         data = response.SerializeToString()
         sys.stdout.write(struct.pack('<I', len(data)))
         sys.stdout.write(data)
+        sys.stdout.flush()
 
 
 if __name__ == '__main__':

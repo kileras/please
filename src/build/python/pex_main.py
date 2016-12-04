@@ -14,7 +14,10 @@ except ImportError:
 # These will get templated in by the build rules.
 MODULE_DIR = '__MODULE_DIR__'
 ENTRY_POINT = '__ENTRY_POINT__'
-ZIP_SAFE = __ZIP_SAFE__
+try:
+    ZIP_SAFE = __ZIP_SAFE__
+except NameError:
+    ZIP_SAFE = True
 
 ABSOLUTE_IMPORT_ONLY = 0
 DEFAULT_IMPORT_LEVEL = -1 if sys.version_info[0] < 3 else 0

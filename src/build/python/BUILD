@@ -64,6 +64,7 @@ build_rule(
         '//third_party/python:_six#install',
         '//third_party/python:_xmlrunner#install',
         '//third_party/python:_coverage#install',
+        '//third_party/python:_protobuf#install',
         '//src/build/proto:_worker#protoc_py',
     ],
     visibility = ['PUBLIC'],

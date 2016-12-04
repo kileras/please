@@ -36,18 +36,18 @@ var workerMutex sync.Mutex
 // buildMaybeRemotely builds a target, either sending it to a remote worker if needed,
 // or locally if not.
 func buildMaybeRemotely(state *core.BuildState, target *core.BuildTarget, inputHash []byte) ([]byte, error) {
-	worker, workerArgs, localCmd := workerCommandAndArgs(target)
+	worker, workerArgs, remoteArgs, localCmd := workerCommandAndArgs(target)
 	if worker == "" {
 		return runBuildCommand(state, target, localCmd, inputHash)
 	}
 	// The scheme here is pretty minimal; remote workers currently have quite a bit less info than
 	// local ones get. Over time we'll probably evolve it to add more information.
-	opts, err := shlex.Split(workerArgs)
+	opts, err := shlex.Split(remoteArgs)
 	if err != nil {
 		return nil, err
 	}
-	log.Debug("Sending remote build request to %s; opts %s", worker, workerArgs)
-	resp, err := buildRemotely(worker, &pb.BuildRequest{
+	log.Debug("Sending remote build request to %s %s; opts %s", worker, workerArgs, remoteArgs)
+	resp, err := buildRemotely(worker, workerArgs, &pb.BuildRequest{
 		Rule:    target.Label.String(),
 		TempDir: path.Join(core.RepoRoot, target.TmpDir()),
 		Srcs:    target.AllSourcePaths(state.Graph),
@@ -69,8 +69,14 @@ func buildMaybeRemotely(state *core.BuildState, target *core.BuildTarget, inputH
 }
 
 // buildRemotely runs a single build request and returns its response.
-func buildRemotely(worker string, req *pb.BuildRequest) (*pb.BuildResponse, error) {
-	w, err := getOrStartWorker(worker)
+func buildRemotely(worker, workerArgs string, req *pb.BuildRequest) (*pb.BuildResponse, error) {
+	// Handle $SRCS and $TMP_DIR as a convenience for the worker.
+	// Other usual env vars are not handled yet.
+	srcs := strings.Join(req.Srcs, " ")
+	for i, opt := range req.Opts {
+		req.Opts[i] = strings.Replace(strings.Replace(opt, "$TMP_DIR", req.TempDir, -1), "$SRCS", srcs, -1)
+	}
+	w, err := getOrStartWorker(worker, workerArgs)
 	if err != nil {
 		return nil, err
 	}
@@ -84,18 +90,20 @@ func buildRemotely(worker string, req *pb.BuildRequest) (*pb.BuildResponse, erro
 }
 
 // getOrStartWorker either retrieves an existing worker process or starts a new one.
-func getOrStartWorker(worker string) (*workerServer, error) {
+func getOrStartWorker(worker, args string) (*workerServer, error) {
+	mapKey := worker + args // Must identify it fully
 	workerMutex.Lock()
 	defer workerMutex.Unlock()
-	if w, present := workerMap[worker]; present {
+	if w, present := workerMap[mapKey]; present {
 		return w, nil
 	}
+	log.Notice("Forking new remote worker process: %s %s", worker, args)
 	// Need to create a new process
-	cmds, err := shlex.Split(worker)
+	cmdArgs, err := shlex.Split(args)
 	if err != nil {
 		return nil, err
 	}
-	cmd := exec.Command(cmds[0], cmds[1:]...)
+	cmd := exec.Command(worker, cmdArgs...)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, err
@@ -108,13 +116,16 @@ func getOrStartWorker(worker string) (*workerServer, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
+	// TODO(pebers): we need some way of monitoring the state of this process.
+	//               If it dies later on we may try sending it build requests
+	//               which are never served.
 	w := &workerServer{
 		requests:  make(chan *pb.BuildRequest),
 		responses: map[string]chan *pb.BuildResponse{},
 	}
 	go w.sendRequests(stdin)
 	go w.readResponses(stdout)
-	workerMap[worker] = w
+	workerMap[mapKey] = w
 	return w, nil
 }
 

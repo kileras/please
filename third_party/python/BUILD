@@ -63,5 +63,6 @@ pip_library(
     name = 'protobuf',
     version = '3.0.0',
     outs = ['google'],
+    post_install_commands = ['touch $OUT/__init__.py'],
     deps = [':six'],
 )

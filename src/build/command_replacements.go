@@ -62,7 +62,7 @@ var outExeReplacement = regexp.MustCompile(`\$\(out_exe ([^\)]+)\)`)
 var outReplacement = regexp.MustCompile(`\$\(out_location ([^\)]+)\)`)
 var dirReplacement = regexp.MustCompile(`\$\(dir ([^\)]+)\)`)
 var hashReplacement = regexp.MustCompile(`\$\(hash ([^\)]+)\)`)
-var workerReplacement = regexp.MustCompile(`^(.*)\$\(worker ([^\)]+)\) *([^&]*)(?: *&& *(.*))?$`)
+var workerReplacement = regexp.MustCompile(`^(.*)\$\(worker ([^ ]+)((?:\$\([^\)]+\)|[^\)])*)?\) *([^&]*)(?: *&& *(.*))?$`)
 
 // Replace escape sequences in the target's command.
 // For example, $(location :blah) -> the output of rule blah.
@@ -84,17 +84,31 @@ func ReplaceTestSequences(target *core.BuildTarget, command string) string {
 	return replaceSequencesInternal(target, command, true)
 }
 
-// workerCommandAndArgs returns the worker & its command (if any) and subsequent local command for the rule.
-func workerCommandAndArgs(target *core.BuildTarget) (string, string, string) {
+// workerCommandAndArgs returns the worker, its args & its command (if any) and subsequent local command for the rule.
+func workerCommandAndArgs(target *core.BuildTarget) (string, string, string, string) {
 	match := workerReplacement.FindStringSubmatch(target.GetCommand())
 	if match == nil {
-		return "", "", ReplaceSequences(target, target.GetCommand())
+		return "", "", "", ReplaceSequences(target, target.GetCommand())
 	} else if match[1] != "" {
 		panic("$(worker) replacements cannot have any commands preceding them.")
 	}
-	return replaceSequence(target, core.ExpandHomePath(match[2]), true, false, false, false, false, false),
+	// Non-absolute non-label paths are interpreted as being on the PATH somewhere.
+	if match[2][0] != '/' {
+		match[2] = core.ExpandHomePath(match[2])
+		if match[2][0] != '/' {
+			p, err := core.LookPath(match[2], core.State.Config.Build.Path)
+			if err != nil {
+				panic(err)
+			}
+			match[2] = p
+		}
+	} else {
+		match[2] = replaceSequence(target, match[2], true, false, false, false, false, false)
+	}
+	return match[2],
 		replaceSequencesInternal(target, strings.TrimSpace(match[3]), false),
-		replaceSequencesInternal(target, match[4], false)
+		replaceSequencesInternal(target, strings.TrimSpace(match[4]), false),
+		replaceSequencesInternal(target, match[5], false)
 }
 
 func replaceSequencesInternal(target *core.BuildTarget, command string, test bool) string {
